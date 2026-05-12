@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Expense — Spendly{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/add_expense.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="auth-section">
+    <div class="auth-container">
+
+        <div class="auth-header">
+            <h1 class="auth-title">Edit Expense</h1>
+            <p class="auth-subtitle">Update your transaction details</p>
+        </div>
+
+        <div class="auth-card">
+            <form method="POST" action="{{ url_for('edit_expense', id=expense.id) }}">
+
+                <div class="form-group">
+                    <label for="amount">Amount (₹)</label>
+                    <input type="number" id="amount" name="amount"
+                           class="form-input"
+                           placeholder="0.00"
+                           step="0.01" min="0.01"
+                           value="{{ form.get('amount', expense.amount) }}"
+                           required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    {% set selected_cat = form.get('category', expense.category) %}
+                    <select id="category" name="category" class="form-input form-select" required>
+                        <option value="" disabled {% if not selected_cat %}selected{% endif %}>Select a category</option>
+                        {% for c in categories %}
+                        <option value="{{ c }}" {% if selected_cat == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" name="date"
+                           class="form-input"
+                           value="{{ form.get('date', expense.date) }}"
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description <span class="field-optional">(optional)</span></label>
+                    <textarea id="description" name="description"
+                              class="form-input form-textarea"
+                              placeholder="What was this for?"
+                              maxlength="200">{{ form.get('description', expense.description) }}</textarea>
+                </div>
+
+                <button type="submit" class="btn-submit">Save Changes</button>
+
+            </form>
+        </div>
+
+        <p class="auth-switch">
+            <a href="{{ url_for('profile') }}">← Back to profile</a>
+        </p>
+
+    </div>
+</section>
+{% endblock %}

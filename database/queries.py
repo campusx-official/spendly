@@ -3,6 +3,36 @@ from datetime import datetime
 from database.db import get_db
 
 
+def get_expense_by_id(expense_id, user_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, amount, category, date, description "
+        "FROM expenses WHERE id = ? AND user_id = ?",
+        (expense_id, user_id),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {
+        "id": row["id"],
+        "amount": row["amount"],
+        "category": row["category"],
+        "date": row["date"],
+        "description": row["description"] or "",
+    }
+
+
+def update_expense(expense_id, user_id, amount, category, expense_date, description):
+    conn = get_db()
+    conn.execute(
+        "UPDATE expenses SET amount = ?, category = ?, date = ?, description = ? "
+        "WHERE id = ? AND user_id = ?",
+        (amount, category, expense_date, description or None, expense_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def insert_expense(user_id, amount, category, expense_date, description):
     conn = get_db()
     cursor = conn.execute(
@@ -35,7 +65,9 @@ def get_user_by_id(user_id):
 
     name = row["name"]
     initials = "".join(w[0].upper() for w in name.split() if w)
-    member_since = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").strftime("%B %Y")
+    member_since = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").strftime(
+        "%B %Y"
+    )
 
     return {
         "name": name,
@@ -51,11 +83,9 @@ def get_recent_transactions(user_id, limit=10, date_from=None, date_to=None):
 
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, description, category, amount "
+        "SELECT id, date, description, category, amount "
         "FROM expenses "
-        "WHERE user_id = ? "
-        + date_clause +
-        " ORDER BY date DESC, id DESC "
+        "WHERE user_id = ? " + date_clause + " ORDER BY date DESC, id DESC "
         "LIMIT ?",
         params,
     ).fetchall()
@@ -63,6 +93,7 @@ def get_recent_transactions(user_id, limit=10, date_from=None, date_to=None):
 
     return [
         {
+            "id": row["id"],
             "date": datetime.strptime(row["date"], "%Y-%m-%d").strftime("%d %b %Y"),
             "description": row["description"],
             "category": row["category"],
@@ -79,8 +110,7 @@ def get_summary_stats(user_id, date_from=None, date_to=None):
     conn = get_db()
     row = conn.execute(
         "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count "
-        "FROM expenses WHERE user_id = ? "
-        + date_clause,
+        "FROM expenses WHERE user_id = ? " + date_clause,
         params,
     ).fetchone()
     total_value = row["total"]
@@ -88,8 +118,8 @@ def get_summary_stats(user_id, date_from=None, date_to=None):
 
     cat_row = conn.execute(
         "SELECT category FROM expenses WHERE user_id = ? "
-        + date_clause +
-        " GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
+        + date_clause
+        + " GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
         params,
     ).fetchone()
     conn.close()
@@ -109,9 +139,7 @@ def get_category_breakdown(user_id, date_from=None, date_to=None):
     rows = conn.execute(
         "SELECT category AS name, SUM(amount) AS total "
         "FROM expenses "
-        "WHERE user_id = ? "
-        + date_clause +
-        " GROUP BY category "
+        "WHERE user_id = ? " + date_clause + " GROUP BY category "
         "ORDER BY total DESC",
         params,
     ).fetchall()
