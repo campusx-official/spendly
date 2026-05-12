@@ -13,6 +13,12 @@
         </div>
 
         <div class="auth-card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% for category, message in messages %}
+              <div class="auth-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endwith %}
+
             <form method="POST" action="{{ url_for('login') }}">
                 <div class="form-group">
                     <label for="email">Email address</label>

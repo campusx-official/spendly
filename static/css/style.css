@@ -103,7 +103,6 @@ a { color: inherit; text-decoration: none; }
 .nav-links a { color: var(--ink-muted); transition: color 0.2s; }
 .nav-links a:hover { color: var(--ink); }
 .nav-link-active { color: var(--accent) !important; font-weight: 500; }
-.nav-username { color: var(--ink) !important; font-weight: 600; }
 
 .nav-cta {
     background: var(--ink) !important;
@@ -120,29 +119,6 @@ a { color: inherit; text-decoration: none; }
 /* ------------------------------------------------------------------ */
 
 .main-content { min-height: calc(100vh - 60px - 100px); }
-
-.flash-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem 1.5rem 0;
-}
-
-.flash {
-    width: 100%;
-    max-width: 440px;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-align: center;
-}
-
-.flash-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-.flash-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-.flash-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-.flash-info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
 /* ------------------------------------------------------------------ */
 /* Hero                                                                */
