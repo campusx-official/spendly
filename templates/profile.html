@@ -19,6 +19,7 @@
                 <p class="profile-email">{{ user.email }}</p>
                 <p class="profile-since">Member since {{ user.member_since }}</p>
             </div>
+            <a href="{{ url_for('add_expense') }}" class="btn-primary profile-add-btn">+ Add Expense</a>
         </div>
 
         <!-- Filter bar -->
@@ -75,7 +76,6 @@
             <div class="profile-section">
                 <div class="section-title-row">
                     <h2 class="section-title">Recent Transactions</h2>
-                    <a href="{{ url_for('add_expense') }}" class="btn-primary">+ Add Expense</a>
                 </div>
                 <div class="tx-table-wrapper">
                     <table class="tx-table">

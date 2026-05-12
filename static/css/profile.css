@@ -71,6 +71,11 @@
     padding: 2rem;
 }
 
+.profile-add-btn {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .profile-avatar {
     width: 72px;
     height: 72px;
