@@ -217,15 +217,21 @@ Keep that pattern for any new per-resource route.
 ## Testing
 
 ```bash
-pytest                              # full suite — currently 138 passed, 0 failed
+pytest                              # full suite — currently 183 passed, 0 failed
 pytest tests/test_06_date_filter_profile.py
 pytest -k "test_name"
 pytest -s                           # visible output
 ```
 
-Test files are named `test_<NN>_<slug>.py` with underscores throughout —
+Feature test files are named `test_<NN>_<slug>.py` with underscores throughout —
 `test_06_date_filter_profile.py`, `test_07_add_expense.py`,
 `test_09_delete_expense.py`. Keep that shape; hyphens break `-k` filtering.
+
+`tests/test_hooks.py` covers the `.claude/hooks/` scripts over their real
+stdin/stdout JSON contract. It exists because `protect_paths.py` shipped with four
+false positives that blocked ordinary commands — `git add` (matched the `dd` verb),
+`confirm` (matched `rm`), `->` arrows and `>/dev/null` (both read as truncating
+redirects). Each is pinned there. Run it after editing any hook.
 
 Test files patch `database.db.DB_PATH` to a `tempfile` **before importing `app`**,
 so they never touch the real `spendly.db`. Reuse that pattern — do not add a

@@ -62,7 +62,7 @@ context:
   - `database/` directory
 - Run command:
   `python -m pytest tests/test_$ARGUMENTS.py -v`
-- Known baseline: the full suite is **138 passed, 0 failed**. Any failure in the new
+- Known baseline: the full suite is **183 passed, 0 failed**. Any failure in the new
   file is a real defect in either the test or the feature — never dismiss one as
   pre-existing without checking `git diff`.
 - Instruction: Run ONLY the specified test file. Do 

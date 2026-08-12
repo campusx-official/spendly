@@ -132,7 +132,7 @@ Next: run /create-spec for the next feature
 - Always delete both remote and local branch after merge
 - **Never merge with failing or pending checks.** Step 6 is a gate, not a formality.
 - **Run the test suite before committing** if the working tree touches `app.py`,
-  `database/`, or `templates/`: `python -m pytest -q`. The baseline is 138 passed,
+  `database/`, or `templates/`: `python -m pytest -q`. The baseline is 183 passed,
   0 failed. A regression must not be shipped — stop and report it.
 - **`git add .` will not stage a `.db` file** — `.gitignore` excludes `*.db`. If a
   database change is genuinely part of the feature, that is a schema change with no

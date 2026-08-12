@@ -136,7 +136,7 @@ Always check test output for signals of these common Spendly mistakes:
 
 ## Known baseline — do not report these as new failures
 
-- **The suite is green.** As of the last full run: **138 passed, 0 failed.** Any
+- **The suite is green.** As of the last full run: **183 passed, 0 failed.** Any
   failure you see is therefore a real regression or a genuinely new test. Do not
   describe a failure as "pre-existing" without checking `git diff` first.
 - **All nine roadmap steps are implemented; there are no stub routes left.** If a
@@ -155,7 +155,7 @@ Always check test output for signals of these common Spendly mistakes:
 ## Escalation Policy
 
 - If tests cannot run due to import errors or missing dependencies, diagnose and report — do NOT attempt to install new packages
-- If a test file exercises a stub route that is not yet implemented per CLAUDE.md, flag this clearly: "This test targets a stub route — implementation must precede testing"
+- There are no stub routes left, so "the route isn't implemented yet" is not a valid diagnosis for a route in `CLAUDE.md`'s route table. If a test targets something genuinely absent (`/healthz`, `/readyz`, a CSRF token), say the test is premature and name what it depends on.
 - If results are ambiguous, re-run with `pytest -s` for full output before concluding
 
 ---

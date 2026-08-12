@@ -48,7 +48,10 @@ DESTRUCTIVE_VERBS = [
 #                      (append does not truncate, so it is not our problem)
 # and requires the target to look like a path or filename rather than any
 # non-space character.
-TRUNCATING_REDIRECT = r"(?<![-=<>])>(?![>=])\s*[\w./~$'\"]"
+#
+# `/dev/null` and friends are also excluded: discarding output is the single most
+# common redirect in any script and destroys nothing.
+TRUNCATING_REDIRECT = r"(?<![-=<>])>(?![>=])\s*(?!/dev/)[\w./~$'\"]"
 
 # Operations that read as destructive but touch only git's index, leaving the
 # file on disk untouched. Untracking a committed database is exactly the fix this
