@@ -10,13 +10,36 @@ You are designing frontend UI for **Spendly**, a personal expense tracker. Spend
 
 ## What Spendly's stack looks like
 
-- **Backend:** Flask (`app.py`), SQLite or similar (`database/`)
-- **Templates:** Jinja2 in `templates/` (e.g. `base.html`, `dashboard.html`, `add_expense.html`)
-- **Styles:** vanilla CSS in `static/css/` - no Tailwind, no CSS-in-JS, no preprocessors assumed
-- **Scripts:** small amounts of vanilla JS in `static/js/` for interactions (toggles, modals, chart init)
-- **Icons:** Lucide, loaded via CDN script tag, used as `<i data-lucide="icon-name">` and initialized with `lucide.createIcons()`
+- **Backend:** Flask (`app.py`), SQLite (`database/db.py` + `database/queries.py`)
+- **Templates:** Jinja2 in `templates/` — `base.html` (layout every page extends),
+  `landing.html`, `login.html`, `register.html`, `profile.html` (the dashboard —
+  there is no `dashboard.html`), `add_expense.html`, `edit_expense.html`,
+  `analytics.html` (coming-soon placeholder), `terms.html`, `privacy.html`
+- **Styles:** vanilla CSS in `static/css/` — `style.css` is global and owns the
+  design tokens; `landing.css`, `profile.css`, `add_expense.css`, `analytics.css`
+  are page-scoped. No Tailwind, no CSS-in-JS, no preprocessors.
+- **Scripts:** `static/js/main.js` — currently **empty**. There is no JS
+  infrastructure yet, so anything interactive you add is the first of its kind.
+- **Icons:** currently **none**. The app uses text glyphs (`◈` for the brand mark).
 
 Generate output that fits this stack. Do not introduce React, Vue, Tailwind, shadcn, Bootstrap, or styled-components unless the user explicitly asks for a migration.
+
+### Icons: read this before emitting `data-lucide`
+
+**Lucide is not loaded anywhere in this project.** `base.html` loads Google Fonts,
+`style.css`, and `main.js` — nothing else. Emitting `<i data-lucide="wallet">`
+without adding the library produces an empty, invisible element.
+
+If a design genuinely needs icons, you must either:
+
+1. Add the CDN script to `base.html` and call `lucide.createIcons()` — and say so
+   explicitly in your integration note, because it is a new external dependency on
+   every page; or
+2. Inline the SVG you need directly in the template. `analytics.html` already does
+   this with a hand-written `<svg>` — follow that precedent for one or two icons.
+
+Prefer inline SVG for small counts. Reach for the CDN only when a page needs many
+icons, and flag it as a decision for the user rather than making it silently.
 
 ## Before you design: check what already exists
 
@@ -34,22 +57,65 @@ If you can't see the existing files and the request is non-trivial, ask the user
 
 ## The Spendly design language
 
-When you have no existing reference to follow, default to this. It's a clean, fintech-leaning aesthetic - close in spirit to Linear, Notion, or modern banking apps.
+Spendly already has a design language, and it is **not** the generic indigo-on-white
+fintech look. It is warm, editorial, print-leaning: cream paper, forest green, a
+serif display face. Match it. Anything that arrives looking like default Tailwind is
+wrong for this product.
 
-**Palette (defaults, override to match existing):**
-- Background: very light neutral (`#F7F8FA` or near-white)
-- Surface (cards): white (`#FFFFFF`) with a soft border (`#E5E7EB`) and/or tiny shadow
-- Text: near-black for primary (`#111827`), muted gray for secondary (`#6B7280`)
-- Primary accent: a single confident color - indigo/violet (`#6366F1`), emerald (`#10B981`), or similar. Pick one and stick with it.
-- Semantic: green for income/positive (`#10B981`), red for expense/negative (`#EF4444`), amber for warnings (`#F59E0B`)
+**Use the tokens — never hardcode a hex value.** These are defined on `:root` in
+`static/css/style.css` and are the single source of truth:
 
-**Spacing:** 8px grid. Use multiples of 4px or 8px for padding, gap, margin. Don't use arbitrary values like 13px or 27px.
+```css
+/* Ink — text */
+--ink: #0f0f0f;          --ink-soft: #2d2d2d;
+--ink-muted: #6b6b6b;    --ink-faint: #a0a0a0;
 
-**Radius:** `8px` for inputs and small elements, `12px` for cards, `16px` for modals. Pills/badges can be fully rounded.
+/* Paper — backgrounds */
+--paper: #f7f6f3;        /* page background, warm off-white */
+--paper-warm: #f0ede6;   /* subtle raised/alternate fill */
+--paper-card: #ffffff;   /* card surfaces */
 
-**Shadows:** subtle only. A card shadow like `0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06)` is the ceiling. No glows, no heavy drop shadows.
+/* Accent — forest green primary, ochre secondary */
+--accent: #1a472a;       --accent-light: #e8f0eb;
+--accent-2: #c17f24;     --accent-2-light: #fdf3e3;
 
-**Typography:** system font stack is fine (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) or Inter if the project uses it. Type scale: 12 / 14 / 16 / 20 / 24 / 32. Font weights: 400 body, 500 medium, 600 semibold for headings. Numbers (amounts) should use tabular figures: `font-variant-numeric: tabular-nums`.
+/* Semantic */
+--danger: #c0392b;       --danger-light: #fdecea;
+
+/* Structure */
+--border: #e4e1da;       --border-soft: #eeebe4;
+
+/* Type */
+--font-display: 'DM Serif Display', Georgia, serif;
+--font-body: 'DM Sans', system-ui, sans-serif;
+
+/* Layout */
+--max-width: 1200px;     --auth-width: 440px;
+--radius-sm: 6px;        --radius-md: 12px;  --radius-lg: 20px;
+```
+
+**Typography:** `--font-display` (DM Serif Display) for headings and page titles —
+this serif is what gives Spendly its character, so do not replace it with a sans
+heading. `--font-body` (DM Sans) for everything else. Both are already loaded in
+`base.html` via Google Fonts; do not add another font link. Amounts should use
+`font-variant-numeric: tabular-nums` so columns of rupee figures align.
+
+**Currency is the rupee (`₹`).** Amounts are pre-formatted as strings by
+`database/queries.py` (`"{:,.2f}"`), so templates render `₹{{ tx.amount }}` — do not
+apply number formatting in Jinja or JS.
+
+**Radius:** use `--radius-sm` for inputs and badges, `--radius-md` for cards,
+`--radius-lg` for large panels and modals.
+
+**Spacing:** 8px grid. Multiples of 4px or 8px for padding, gap, margin. No
+arbitrary 13px or 27px values. There is no spacing token scale — use literal
+multiples and stay consistent within a page.
+
+**Shadows:** subtle only. This design leans on `--border` and `--border-soft` far
+more than on shadow. If a border will do, use the border. No glows.
+
+**If you add a new colour**, add it as a token on `:root` in `style.css` first, then
+reference it. A raw hex in a page stylesheet is a review finding.
 
 **Layout patterns:**
 - Card-based composition - group related info in surfaces, don't sprawl
@@ -97,10 +163,10 @@ Name the key sections of the page/component and any notable UX decisions. Keep i
 
 ### 2. The code
 - **Template file(s)** - full Jinja2 with `{% extends "base.html" %}` and a `{% block content %}` unless building `base.html` itself. Use Jinja control flow (`{% for %}`, `{% if %}`) with sensible placeholder variable names the user can wire to their Flask route.
-- **CSS** - either a new file (e.g. `static/css/dashboard.css`) or additions to an existing stylesheet. Scope with a page/component class prefix (`.dashboard-...`, `.tx-table-...`) so styles don't leak.
+- **CSS** - either a new page file (e.g. `static/css/reports.css`) or additions to an existing stylesheet. Scope with a page/component class prefix (`.profile-...`, `.tx-table-...`, matching what `profile.css` already does) so styles don't leak.
 - **JS** (only if needed) - vanilla, no frameworks. Small and readable.
 
-Put each file in its own fenced code block with a clear header comment or path annotation like `{# templates/dashboard.html #}` or `/* static/css/dashboard.css */`.
+Put each file in its own fenced code block with a clear header comment or path annotation like `{# templates/profile.html #}` or `/* static/css/profile.css */`.
 
 ### 3. Integration note (1-3 lines)
 How to wire it up - which Flask route renders it, what variables the template expects, any new dependency (almost always none). If the user needs to add a link in the sidebar or a route in `app.py`, call that out.
@@ -131,13 +197,44 @@ Don't pepper the user with clarifying questions for things you can reasonably de
 - Primary action "Add expense" anchors bottom-right; cancel is a subtle text button
 - Amount field gets a currency symbol prefix and tabular-nums
 
-**Template:** `templates/partials/add_expense_modal.html` - extends nothing, included via `{% include %}`. Uses a `.modal` overlay pattern already in `base.css` if present.
+**Template:** `templates/add_expense.html` — already exists and extends `base.html`.
+Modify it rather than creating a partial; Spendly has no `templates/partials/`
+directory and no `{% include %}` usage yet, so introducing one is a structural
+decision to raise, not to assume.
 
-**CSS:** additions to `static/css/components.css` for the new pill selector; reuses existing `.input`, `.btn-primary`, `.modal` classes.
+**CSS:** additions to the existing `static/css/add_expense.css`, loaded through
+`{% block head %}`. Reuse `.btn-primary`, which `profile.html` already uses. There is
+no `components.css` and no `.modal` class anywhere — check before referencing a class
+as existing.
 
-**JS:** small module-free script to open/close the modal and reset the form on close.
+**JS:** `static/js/main.js` is empty, so any interaction is the first script in the
+project. Keep it small, module-free, and guard for the element being absent
+(`main.js` loads on every page, including ones without your component).
 
 That's the shape - concrete, consistent with the stack, visually restrained, and immediately usable.
+
+---
+
+## Where this skill sits in the workflow
+
+- `spendly-quality-reviewer` reads this file before commenting on templates or CSS,
+  so its review and your output agree on what "correct" means.
+- Backend wiring is out of scope here. If a design needs new data, name the template
+  variables you expect and say which route must supply them — do not edit `app.py`
+  or `database/` yourself.
+- Deployment concerns (static file serving, CDN, cache headers) belong to the
+  `spendly-devops` skill, not here.
+
+## Verify before you hand off
+
+- [ ] Every colour is a `var(--token)`, no raw hex
+- [ ] Headings use `--font-display`; body uses `--font-body`
+- [ ] Template extends `base.html` and uses `{% block head %}` for its stylesheet
+- [ ] Every internal link is `url_for(...)`, never a literal path
+- [ ] Amounts render as `₹{{ value }}` with no Jinja number formatting
+- [ ] No `data-lucide` unless you also added the library and said so
+- [ ] Referenced CSS classes actually exist — grep before claiming reuse
+- [ ] Layout stacks and tables scroll below ~768px
 
 
 
