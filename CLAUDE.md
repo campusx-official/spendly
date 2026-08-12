@@ -217,7 +217,7 @@ Keep that pattern for any new per-resource route.
 ## Testing
 
 ```bash
-pytest                              # full suite — currently 183 passed, 0 failed
+pytest                              # full suite — currently 186 passed, 0 failed
 pytest tests/test_06_date_filter_profile.py
 pytest -k "test_name"
 pytest -s                           # visible output
@@ -228,10 +228,26 @@ Feature test files are named `test_<NN>_<slug>.py` with underscores throughout �
 `test_09_delete_expense.py`. Keep that shape; hyphens break `-k` filtering.
 
 `tests/test_hooks.py` covers the `.claude/hooks/` scripts over their real
-stdin/stdout JSON contract. It exists because `protect_paths.py` shipped with four
-false positives that blocked ordinary commands — `git add` (matched the `dd` verb),
-`confirm` (matched `rm`), `->` arrows and `>/dev/null` (both read as truncating
-redirects). Each is pinned there. Run it after editing any hook.
+stdin/stdout JSON contract. It exists because `protect_paths.py` shipped with five
+false positives, each of which blocked an ordinary command:
+
+| Blocked | Why |
+|---|---|
+| `git add -A` | `dd\b` matched the "dd" inside **add** |
+| `echo 'confirm ...'` | `rm\b` matched the "rm" inside **confirm** |
+| `-> arrows` in prose | `>` read as a truncating redirect |
+| `>/dev/null` | same, on a discard redirect |
+| `<noreply@anthropic.com>` | the closing `>` of an angle-bracketed email |
+
+Every verb now needs a **leading** word boundary, redirects exclude arrows,
+comparisons, appends and `/dev/*`, angle-bracketed tokens are stripped first, and
+`git rm --cached` is allowed because it is index-only. All five are pinned as
+tests. Run them after editing any hook.
+
+Note the guard matches substrings of the command text, so it will also block a
+command that merely *mentions* a protected path alongside a destructive verb — a
+test harness passing `rm spendly.db` as data, for instance. That is why the hook
+cases live in a file rather than inline in a shell command.
 
 Test files patch `database.db.DB_PATH` to a `tempfile` **before importing `app`**,
 so they never touch the real `spendly.db`. Reuse that pattern — do not add a
@@ -255,4 +271,4 @@ Registration posts `name`, `email`, `password`, `confirm_password`. Login posts
 - **`seed_db()` runs at import time** and creates `demo@spendly.com` / `demo123`. Harmless locally; a working backdoor on any public host.
 - **There is no CSRF protection.** `/expenses/<id>/delete` accepts POST, so a third-party page can trigger a delete in a logged-in browser. Known gap — raise it, don't silently add a dependency for it.
 - **There is no migration system.** `init_db()` only does `CREATE TABLE IF NOT EXISTS` and never alters existing tables. A schema change means hand-editing a live SQLite file — back it up first with `VACUUM INTO`, never `cp`.
-- **Three `.db` files are committed to git** (`spendly.db`, `spendly-backup.db`, and an empty `database/spendly.db`). They contain real user data. `.gitignore` now excludes them, but they are still tracked — run `git rm --cached spendly.db spendly-backup.db database/spendly.db` to untrack.
+- **The SQLite files are untracked and gitignored** (`*.db`), because they hold real user emails and password hashes. Two consequences: your local database never appears in `git status`, and switching to a branch from before the untracking will delete it from disk. It is recoverable from history — `git checkout 1c738d6 -- spendly.db` — and `python app.py` will otherwise recreate an empty one with the demo seed. **Their prior contents remain in git history from commits before the untracking**; purging that needs a history rewrite, which has not been done.

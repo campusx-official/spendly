@@ -53,6 +53,15 @@ DESTRUCTIVE_VERBS = [
 # common redirect in any script and destroys nothing.
 TRUNCATING_REDIRECT = r"(?<![-=<>])>(?![>=])\s*(?!/dev/)[\w./~$'\"]"
 
+# Angle-bracketed tokens with no internal whitespace are never redirects:
+# <noreply@anthropic.com>, <placeholder>, <div>. Their closing ">" would
+# otherwise read as one - which blocked a commit whose only sin was a
+# Co-Authored-By trailer. Stripped before the redirect check.
+#
+# Requires no internal whitespace on purpose, so a genuine "cmd < in > out"
+# is left intact.
+ANGLE_TOKEN = r"<[^<>\s]+>"
+
 # Operations that read as destructive but touch only git's index, leaving the
 # file on disk untouched. Untracking a committed database is exactly the fix this
 # repo needs, so blocking it would push people toward plumbing workarounds.
@@ -79,7 +88,7 @@ def main():
     hit_verb = next(
         (v for v in DESTRUCTIVE_VERBS if re.search(r"\b" + v + r"\b", command)), None
     )
-    if not hit_verb and re.search(TRUNCATING_REDIRECT, command):
+    if not hit_verb and re.search(TRUNCATING_REDIRECT, re.sub(ANGLE_TOKEN, "", command)):
         hit_verb = "> redirect"
     if not hit_verb:
         return 0

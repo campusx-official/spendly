@@ -53,7 +53,7 @@ Each of these has actually bitten this repo's shape. Verify every one that appli
 
 | # | Check | Why it is critical |
 |---|---|---|
-| 1 | `*.db` excluded in `.dockerignore` | Three real `.db` files are committed to git. Without this the image ships every user's email, password hash, and full spending history. |
+| 1 | `*.db` excluded in `.dockerignore` | The database is gitignored but still exists on disk in every checkout, and `.gitignore` does not filter the Docker build context. Without this entry the image ships a developer's real database — every user's email, password hash, and full spending history. |
 | 2 | `SPENDLY_SEED=0` in every deployed env | `seed_db()` creates `demo@spendly.com` / `demo123`. On a public URL that is a working login into a real account. |
 | 3 | `SPENDLY_SECRET_KEY` from a secret store, never a tracked file | A known signing key means anyone forges a session cookie and logs in as any user. Base64 in a manifest is encoding, not encryption. |
 | 4 | No `debug=True` reachable in the deployed path | The Werkzeug debugger is remote code execution. `CMD` must invoke a WSGI server, not `python app.py`. |
