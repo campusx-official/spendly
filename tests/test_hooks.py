@@ -3,10 +3,19 @@
 # Regression coverage for the Claude Code hooks in .claude/hooks/.
 #
 # These are not Spendly features, but they gate every Bash call and every prompt
-# in a session, so a bug in them is expensive: protect_paths.py shipped with four
-# separate false positives that blocked ordinary commands ("git add" matched the
-# "dd" verb, "confirm" matched "rm", every "->" arrow looked like a truncating
-# redirect, and ">/dev/null" looked like one too). Each is pinned below.
+# in a session, so a bug in them is expensive: protect_paths.py shipped with five
+# separate false positives, each of which blocked an ordinary command.
+#
+#   git add -A                  "dd" verb matched inside "add"
+#   echo 'confirm ...'          "rm" verb matched inside "confirm"
+#   -> arrows in prose          read as a truncating redirect
+#   >/dev/null                  same, on a discard redirect
+#   <noreply@anthropic.com>     closing > of an angle-bracketed email
+#
+# Every one is pinned below. Note also that the guard matches substrings of the
+# command text, which is why these cases live in a file: a shell command that
+# merely contains "rm spendly.db" as test data gets blocked by the very hook it
+# is trying to exercise.
 #
 # The hooks are invoked as subprocesses over their real stdin/stdout JSON
 # contract, so these tests exercise exactly what Claude Code exercises.
@@ -52,6 +61,9 @@ class TestProtectPaths:
             "shred spendly.db",              # shred
             "mkfs.ext4 /var/lib/spendly",    # reformat
             "git rm spendly.db",             # git rm WITHOUT --cached deletes on disk
+            # A real input+output redirect pair. The ANGLE_TOKEN strip must not
+            # swallow this one, because "< input.txt >" contains whitespace.
+            "cat < input.txt > spendly.db",
         ],
     )
     def test_destructive_commands_are_blocked(self, command):
@@ -74,6 +86,15 @@ class TestProtectPaths:
             ("cat spendly.db", "reading is not destroying"),
             ("sqlite3 spendly.db 'SELECT 1'", "querying is not destroying"),
             ("ls -la", "no protected path, no destructive verb"),
+            (
+                'git commit -m "touches spendly.db\n\n'
+                'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"',
+                "the closing > of an email in angle brackets is not a redirect",
+            ),
+            (
+                'gh pr create -b "see <placeholder> and spendly.db"',
+                "<placeholder> is not a redirect either",
+            ),
         ],
     )
     def test_safe_commands_are_allowed(self, command, why):

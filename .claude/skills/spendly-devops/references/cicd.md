@@ -4,40 +4,30 @@
 Pipelines that fit the repo's actual workflow: feature branch → PR → squash-merge
 to `main` (that is what the `/ship-feature` slash command does) → deploy from `main`.
 
-## Two blockers to clear first
+## Baseline before you start
 
-**1. Three tests currently fail.** In
-`tests/test_06_date_filter_profile.py::TestQueryHelpers`, the three
-`*_sql_injection_does_not_crash` tests fail: 135 passed, 3 failed. They are wrong
-assertions, not a vulnerability — the queries are correctly parameterised, and
-`date BETWEEN "'; DROP TABLE expenses; --" AND <today>` legitimately matches every
-row because `'` (ASCII 39) sorts below `2` (50). The tests assert `result == []`
-when their own names say the contract is "does not crash".
+The suite is green: **186 passed, 0 failed**, across
+`test_06_date_filter_profile.py`, `test_07_add_expense.py`,
+`test_09_delete_expense.py`, and `test_hooks.py`. Confirm that locally with
+`python -m pytest -q` before wiring anything — a pipeline that is red on its first
+run is a pipeline everyone learns to ignore.
 
-Fix them to match the name before adding CI, or the pipeline is red from the first
-run and everyone learns to ignore it:
+Two things were fixed to get there, and both are worth knowing because they shape
+what the CI job should assert:
 
-```python
-def test_get_category_breakdown_sql_injection_does_not_crash(self, client):
-    _, user_id = client
-    with app.app_context():
-        # A parameterised query binds this as a literal string, so it is a
-        # harmless (if nonsensical) date bound — the point is that nothing
-        # executes and the table survives.
-        get_category_breakdown(user_id, date_from="'; DROP TABLE expenses; --",
-                               date_to=TODAY_STR)
-        conn = get_db()
-        assert conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'"
-        ).fetchone() is not None, "expenses table must survive an injection attempt"
-        conn.close()
-```
+- **Three SQL-injection tests asserted the wrong contract.** They checked that a
+  payload returned zero rows, but a parameterised query binds `"'; DROP TABLE
+  expenses; --"` as a literal, and `'` (ASCII 39) sorts below `2` (50), so
+  `date BETWEEN <payload> AND <today>` legitimately matches every row. They now
+  assert what their names claim — the call returns normally and `expenses` still
+  exists in `sqlite_master`. If you add injection tests, follow that shape; do not
+  assert emptiness.
+- **Test filenames are now `test_<NN>_<slug>.py`** with underscores throughout.
+  Hyphens break `-k` filtering. Keep the convention for anything new.
 
-**2. Test filenames are inconsistent.** `test_07-add-expense.py` uses hyphens,
-`test_06_date_filter_profile.py` uses underscores, `test_delete_expense.py` has no
-step number. pytest collects all three by filename glob, so the suite runs — but
-`-k` filtering and any import-based tooling get awkward. Rename to underscores and a
-consistent `test_<NN>_<slug>.py` scheme while the suite is small.
+`tests/test_hooks.py` covers `.claude/hooks/` over the real stdin/stdout JSON
+contract. Include it in CI — the hooks gate every Bash call in a session, and
+`protect_paths.py` shipped with five false positives that blocked ordinary commands.
 
 ## Workflow 1 — tests on every PR
 

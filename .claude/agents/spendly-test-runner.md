@@ -136,7 +136,7 @@ Always check test output for signals of these common Spendly mistakes:
 
 ## Known baseline — do not report these as new failures
 
-- **The suite is green.** As of the last full run: **183 passed, 0 failed.** Any
+- **The suite is green.** As of the last full run: **186 passed, 0 failed.** Any
   failure you see is therefore a real regression or a genuinely new test. Do not
   describe a failure as "pre-existing" without checking `git diff` first.
 - **All nine roadmap steps are implemented; there are no stub routes left.** If a

@@ -260,22 +260,25 @@ artifacts, update that tree and the "Where things belong" list in the same chang
 the `spendly-test-writer` and `spendly-test-runner` subagents read `CLAUDE.md` for
 project facts, so stale docs actively mislead them.
 
-## Before you deploy anything: two known repo issues
+## Before you deploy anything: repo state to check
 
-Check and report these, because both bite in phase 1.
+Both of the issues this section originally flagged have been fixed — the SQLite
+files are untracked and gitignored, and the test suite is green at 186 passed. Two
+things still need verifying every time, because neither is enforced by anything:
 
-1. **Three SQLite files are committed to git** — `spendly.db` (3 users, 19
-   expenses), `spendly-backup.db` (21 expenses), and an empty stray
-   `database/spendly.db`. `.gitignore` lists `expense_tracker.db`, a filename that
-   does not exist in this repo, and misses `spendly.db` entirely. Without a
-   `.dockerignore` entry the image ships real user data. Fix `.gitignore`,
-   `git rm --cached` the three files, and exclude `*.db` in `.dockerignore`.
+1. **`.dockerignore` must exclude `*.db`.** The database is gitignored, but it
+   *does* exist on disk in any working checkout, so `docker build` would happily
+   copy a developer's real database — with every user's email and password hash —
+   into an image layer. `.gitignore` does not affect the build context; only
+   `.dockerignore` does. Verify the entry is present before the first build.
 
-2. **Three tests currently fail** in
-   `tests/test_06_date_filter_profile.py::TestQueryHelpers` (the
-   `*_sql_injection_does_not_crash` trio). These are wrong assertions, not a
-   vulnerability — the queries are correctly parameterised, and `BETWEEN "'; DROP
-   TABLE..." AND <today>` matches every row because `'` sorts below `2`. The tests
-   assert `result == []` when they should assert "no crash and the table still
-   exists". Fix them before wiring CI, or the pipeline is red on day one.
-   `references/cicd.md` has the corrected assertion.
+   Related, and worth stating once to the user: the prior contents of those files
+   are still in git history from commits before the untracking. Purging that needs
+   a history rewrite (`git filter-repo` or BFG) plus a force-push. It has not been
+   done, and it is a separate decision — do not attempt it as part of a deploy task.
+
+2. **Confirm the suite is green before wiring CI**, with `python -m pytest -q`.
+   The baseline is 186 passed, 0 failed. A red suite turns the first pipeline run
+   into noise everyone learns to ignore. `python .claude/verify_setup.py` should
+   also pass all its checks — it catches references in these skill files that have
+   drifted from the codebase.
