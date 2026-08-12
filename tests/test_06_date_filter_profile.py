@@ -877,36 +877,51 @@ class TestQueryHelpers:
             float(cat["amount"].replace(",", ""))
 
     # --- SQL injection safety ---
+    #
+    # The helpers in database/queries.py bind date_from/date_to as parameters, so
+    # a SQL payload arrives as a literal string value and never as executable SQL.
+    #
+    # Note on what NOT to assert: "'; DROP TABLE expenses; --" sorts BELOW every
+    # real ISO date ("'" is ASCII 39, "2" is 50), so
+    # `date BETWEEN <payload> AND <today>` legitimately matches every row. A
+    # non-empty result is therefore correct behaviour, not evidence of a leak.
+    # The contract under test is the one these tests are named for: the call
+    # returns normally and the schema survives.
+
+    INJECTION = "'; DROP TABLE expenses; --"
+
+    @staticmethod
+    def _expenses_table_exists():
+        conn = get_db()
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'expenses'"
+        ).fetchone()
+        conn.close()
+        return row is not None
 
     def test_get_summary_stats_sql_injection_in_date_param_does_not_crash(self, client):
         _, user_id = client
         with app.app_context():
-            # _parse_date in app.py would reject this as malformed, but we test
-            # the query helper directly to confirm it doesn't error or leak data.
             result = get_summary_stats(
-                user_id,
-                date_from="'; DROP TABLE expenses; --",
-                date_to=TODAY_STR,
+                user_id, date_from=self.INJECTION, date_to=TODAY_STR
             )
-        # The parameterized query should produce 0 results safely
-        assert result["count"] == 0
+        assert isinstance(result["count"], int), "helper must return normally"
+        assert self._expenses_table_exists(), "payload must not have dropped the table"
 
     def test_get_recent_transactions_sql_injection_does_not_crash(self, client):
         _, user_id = client
         with app.app_context():
             result = get_recent_transactions(
-                user_id,
-                date_from="'; DROP TABLE expenses; --",
-                date_to=TODAY_STR,
+                user_id, date_from=self.INJECTION, date_to=TODAY_STR
             )
-        assert result == []
+        assert isinstance(result, list), "helper must return normally"
+        assert self._expenses_table_exists(), "payload must not have dropped the table"
 
     def test_get_category_breakdown_sql_injection_does_not_crash(self, client):
         _, user_id = client
         with app.app_context():
             result = get_category_breakdown(
-                user_id,
-                date_from="'; DROP TABLE expenses; --",
-                date_to=TODAY_STR,
+                user_id, date_from=self.INJECTION, date_to=TODAY_STR
             )
-        assert result == []
+        assert isinstance(result, list), "helper must return normally"
+        assert self._expenses_table_exists(), "payload must not have dropped the table"

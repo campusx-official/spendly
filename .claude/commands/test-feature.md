@@ -1,6 +1,6 @@
 ---
 description: Writes and runs tests for a specific Spendly feature. Pass the spec name as argument e.g. /test-feature 05-backend-connection
-allowed-tools: Bash(python -m pytest)
+allowed-tools: Read, Glob, Agent, Bash(python -m pytest*)
 ---
 
 Run the full testing pipeline for the feature specified 
@@ -26,9 +26,14 @@ following context:
   `.claude/specs/$ARGUMENTS.md`
 - Source files to read for structure:
   - `app.py`
-  - `database/` directory
+  - `database/db.py` and `database/queries.py` — the DB layer is **two** modules
+- Reference test file to copy the isolation pattern from:
+  `tests/test_06_date_filter_profile.py` — it patches `database.db.DB_PATH` to a
+  tempfile *before* importing `app`, which is the only thing that stops a test run
+  from writing to the developer's real `spendly.db`
 - Output test file to create:
-  `tests/test_$ARGUMENTS.py`
+  `tests/test_$ARGUMENTS.py` — normalise the name to underscores
+  (`test_10_foo.py`, not `test_10-foo.py`)
 - Instruction: Write tests based on what the spec says 
   the feature SHOULD do. Do NOT derive test logic from 
   reading the implementation. Cover happy paths, edge 
@@ -57,6 +62,9 @@ context:
   - `database/` directory
 - Run command:
   `python -m pytest tests/test_$ARGUMENTS.py -v`
+- Known baseline: the full suite is **138 passed, 0 failed**. Any failure in the new
+  file is a real defect in either the test or the feature — never dismiss one as
+  pre-existing without checking `git diff`.
 - Instruction: Run ONLY the specified test file. Do 
   NOT run the full test suite. Analyze any failures by 
   cross-referencing the test code, the spec, and the 

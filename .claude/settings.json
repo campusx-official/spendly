@@ -1,12 +1,23 @@
 {
+  "_note": "Hooks invoke `python3`. Verified present on macOS, Linux, and this repo's Windows setup. On a fresh Windows box without a python3 shim, change these three commands to `python`. Do NOT wrap them as `python3 x.py || python x.py` — protect_paths.py signals a block with exit code 2, which `||` would treat as failure and retry against already-consumed stdin, silently disabling the guard.",
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/devops_router.py"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"\nimport sys, json, subprocess\ndata = json.load(sys.stdin)\nfile = data.get('tool_input', {}).get('file_path', '')\nif file.endswith('.py'):\n    subprocess.run(['python3', '-m', 'black', '--quiet', file])\n\""
+            "command": "python3 .claude/hooks/format_python.py"
           }
         ]
       }
@@ -17,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"\nimport sys, json\ndata = json.load(sys.stdin)\ncmd = data.get('tool_input', {}).get('command', '')\nprotected = ['spendly.db', '.env', 'migrations/']\ndangerous = ['rm ', 'rm -', 'unlink ', 'truncate ']\nfor d in dangerous:\n    if d in cmd:\n        for p in protected:\n            if p in cmd:\n                print(f'BLOCKED: Cannot run destructive command on protected file: {p}', file=__import__(\\\"sys\\\").stderr)\n                raise SystemExit(2)\n\""
+            "command": "python3 .claude/hooks/protect_paths.py"
           }
         ]
       }

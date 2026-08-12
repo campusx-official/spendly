@@ -75,14 +75,22 @@ jobs:
 
 ## Workflow 2 — formatting
 
-The repo's `.claude/settings.json` has a `PostToolUse` hook that runs
-`black` on every `.py` file Claude writes. Worth knowing: **that hook invokes
-`python3`, which does not exist on a Windows dev box** (only `python`), so it
-silently no-ops there while working fine on Linux and macOS. The same is true of
-the `PreToolUse` guard that is supposed to block `rm` against `spendly.db`.
+The repo's `.claude/settings.json` has a `PostToolUse` hook
+(`.claude/hooks/format_python.py`) that runs `black` on every `.py` file Claude
+writes. Worth knowing: **`black` is not in `requirements.txt` and is typically not
+installed**, so the hook no-ops on most machines. The `PreToolUse` guard beside it
+needs only the standard library, so that one does work.
 
-Two consequences: fix the hook to be cross-platform, and enforce formatting in CI
-so the outcome does not depend on which machine wrote the code.
+Two consequences: formatting depends on whether an individual dev happened to
+`pip install black`, and CI must enforce it so the outcome does not depend on which
+machine wrote the code.
+
+Also portability: the hooks invoke `python3`. That resolves on macOS, Linux, and
+any Windows box with a `python3` shim on PATH, but a fresh Windows install has only
+`python`. Do not "fix" this by wrapping it as `python3 x.py || python x.py` —
+`protect_paths.py` signals a block with exit code 2, `||` would read that as
+failure and retry against already-consumed stdin, and the guard would silently
+stop blocking. Change the interpreter name instead.
 
 ```yaml
   format:

@@ -2,7 +2,7 @@
 description: Runs parallel security and quality code 
   review for a specific Spendly feature. Pass the spec 
   name as argument e.g. /code-review-feature 03-login
-allowed-tools: Bash(git diff), Bash(git diff --staged)
+allowed-tools: Bash(git diff), Bash(git diff --staged), Bash(git status), Read, Glob
 ---
 
 Run the full code review pipeline for the feature 
@@ -14,14 +14,28 @@ If no argument is provided, stop immediately and say:
 
 ## Pre-flight Check
 
-Before invoking any subagents, collect the diff:
-- Run `git diff` for unstaged changes
-- Run `git diff --staged` for staged changes
-- Combine both into a single diff
+Before invoking any subagents, collect **everything that changed** — not just the
+diff. A feature that adds new files produces an empty `git diff`, so a
+diff-only pre-flight would wrongly report "no changes".
 
-If both are empty, stop immediately and say:
-"No changes detected. Implement the feature before 
-running code review."
+- Run `git status --porcelain` to list new (`??`) and modified files
+- Run `git diff` for unstaged changes to tracked files
+- Run `git diff --staged` for staged changes
+- For each untracked file, `Read` it in full — that is its diff
+
+Combine into a single change set and pass the file list to both reviewers.
+
+If all three are empty, stop immediately and say:
+"No changes detected. Implement the feature before running code review."
+
+**If the change set is only deployment artifacts** (Dockerfile, `compose.yaml`,
+`deploy/**`, `.github/workflows/**`), stop and say:
+"These are deployment artifacts. Use `/deploy-phase <phase>` — it runs
+spendly-devops-reviewer, which audits against the deploy checklists. This command
+reviews application code."
+
+If it is a **mix**, review the application code here and say in the final report
+which deploy artifacts were skipped and why.
 
 ---
 

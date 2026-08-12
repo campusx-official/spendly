@@ -1,7 +1,7 @@
 ---
 description: Create a spec file and feature branch for the next Spendly step
 argument-hint: "Step number and feature name e.g. 2 registration"
-allowed-tools: Read, Write, Glob, Bash(git:*)
+allowed-tools: Read, Write, Glob, Grep, Agent, Bash(git:*)
 ---
 
 You are a senior developer spinning up a new feature for the
@@ -53,15 +53,26 @@ Run:
 git checkout -b <branch_name>
 ```
 
-## Step 6 — Research the codebase
-Read these files before writing the spec:
-- `CLAUDE.md` — roadmap, conventions, schema
-- `app.py` — existing routes and structure
-- `database/db.py` — existing schema and functions
-- All files in `.claude/specs/` — avoid duplicating existing specs
+## Step 6 — Research the codebase (delegate this)
 
-Check `CLAUDE.md` to confirm the requested step is not already
-marked complete. If it is, warn the user and stop.
+`CLAUDE.md`'s Subagent Policy requires codebase research to be delegated before a
+plan or spec is presented. Do not read these files yourself — launch the builtin
+**`Explore`** subagent with breadth "medium" and ask it to report:
+
+- `app.py` — every existing route, its methods, and its auth guard
+- `database/db.py` — connection, schema, and `users` helpers
+- `database/queries.py` — the expense and profile query helpers
+- `templates/` and `static/css/` — which files already exist
+- `.claude/specs/*.md` — so the new spec does not duplicate an existing one
+- `tests/` — which features already have coverage
+
+Read `CLAUDE.md` yourself for conventions and constraints; it is short and you need
+it verbatim.
+
+Then check whether the requested feature already exists. All nine original roadmap
+steps are implemented, so a new spec is almost certainly step 10 or later. If the
+Explore report shows the feature is already built, warn the user and stop rather
+than writing a spec for finished work.
 
 ## Step 7 — Write the spec
 Generate a spec document with this exact structure:
@@ -107,6 +118,10 @@ Specific constraints Claude must follow. Always include:
 - Passwords hashed with werkzeug
 - Use CSS variables — never hardcode hex values
 - All templates extend `base.html`
+- DB logic goes in `database/queries.py` for anything touching `expenses`, or
+  `database/db.py` for connection, schema, and `users` work — never inline in a route
+- Per-resource routes must enforce ownership the way `/expenses/<id>/edit` does:
+  `get_expense_by_id(id, session["user_id"])` returning `None` then `abort(404)`
 
 ## Definition of done
 A specific testable checklist. Each item must be
@@ -126,6 +141,11 @@ Title:     <feature_title>
 
 Then tell the user:
 "Review the spec at `.claude/specs/<step_number>-<feature_slug>.md`
-then enter Plan Mode with Shift+Tab twice to begin implementation."
+then enter Plan Mode with Shift+Tab twice to begin implementation.
+
+After implementing:
+  /test-feature <step_number>-<feature_slug>         write + run tests
+  /code-review-feature <step_number>-<feature_slug>  security + quality review
+  /ship-feature                                      commit, PR, merge, clean up"
 
 Do not print the full spec in chat unless explicitly asked.

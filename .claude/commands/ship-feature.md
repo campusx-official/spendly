@@ -73,9 +73,24 @@ mark every item as checked [x]>
 
 Report: "✓ PR created — <PR URL>"
 
-## Step 6 — Merge PR via GitHub MCP
-Use the GitHub MCP server to merge the pull request
-just created. Use squash merge.
+## Step 6 — Wait for checks, then merge
+
+If CI exists (`.github/workflows/` is non-empty), the PR has status checks and
+merging before they finish either fails or ships untested code. Poll first:
+
+```bash
+gh pr checks --watch --fail-fast
+```
+
+- All checks pass → continue to the merge.
+- Any check fails → **stop**. Report which check failed and its log URL. Do not
+  merge, do not delete the branch, do not switch to main. Say:
+  "CI failed on <check>. Fix it and re-run /ship-feature."
+- No checks configured → say "No CI checks configured — merging unverified" and
+  continue.
+
+Then use the GitHub MCP server to merge the pull request just created, with a
+squash merge.
 
 Report: "✓ PR merged to main"
 
@@ -115,6 +130,16 @@ Next: run /create-spec for the next feature
 - Never commit directly to main
 - Always use squash merge
 - Always delete both remote and local branch after merge
+- **Never merge with failing or pending checks.** Step 6 is a gate, not a formality.
+- **Run the test suite before committing** if the working tree touches `app.py`,
+  `database/`, or `templates/`: `python -m pytest -q`. The baseline is 138 passed,
+  0 failed. A regression must not be shipped — stop and report it.
+- **`git add .` will not stage a `.db` file** — `.gitignore` excludes `*.db`. If a
+  database change is genuinely part of the feature, that is a schema change with no
+  migration system behind it: stop and raise it with the user.
+- **Deployment artifacts are shippable but need review first.** If the tree contains
+  a Dockerfile, manifests, or workflows that `/deploy-phase` has not reviewed, say so
+  and offer to run it before committing.
 - If GitHub MCP is not connected stop and say:
   "GitHub MCP is not connected. Run /mcp to check connection."
 - If push fails due to no upstream, use git push -u origin CURRENT_BRANCH

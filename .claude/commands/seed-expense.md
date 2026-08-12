@@ -4,9 +4,15 @@ argument-hint: "<user_id> <count> <months>"
 allowed-tools: Read, Bash(python3:*)
 ---
 
-Read database/db.py to understand the expenses table 
-schema, the db connection pattern, and the database 
-file name.
+Read `database/db.py` for the expenses table schema, the `get_db()` connection
+pattern, and how `DB_PATH` is resolved. Also read `database/queries.py` — it already
+has an `insert_expense(user_id, amount, category, expense_date, description)` helper.
+**Reuse it** rather than writing raw INSERT SQL; `CLAUDE.md` puts all DB logic in
+`database/`, and that applies to seed scripts too.
+
+Valid categories are exactly: `Food`, `Transport`, `Bills`, `Health`,
+`Entertainment`, `Shopping`, `Other` — the same list `app.py` validates against, so
+seeded rows must use it or they will not match the category breakdown on `/profile`.
 
 User input: $ARGUMENTS
 
