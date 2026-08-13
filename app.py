@@ -1,6 +1,7 @@
 import calendar
 import csv
 import io
+import os
 import sqlite3
 from datetime import date, datetime
 
@@ -17,7 +18,14 @@ from flask import (
 )
 from werkzeug.security import check_password_hash
 
-from database.db import create_user, get_db, get_user_by_email, init_db, seed_db
+from database.db import (
+    create_user,
+    db_is_healthy,
+    get_db,
+    get_user_by_email,
+    init_db,
+    seed_db,
+)
 from database.queries import (
     delete_expense_by_id,
     get_category_breakdown,
@@ -31,7 +39,10 @@ from database.queries import (
 )
 
 app = Flask(__name__)
-app.secret_key = "dev-secret-key"
+app.secret_key = os.environ.get("SPENDLY_SECRET_KEY", "dev-secret-key")
+
+if os.environ.get("SPENDLY_ENV") == "production" and app.secret_key == "dev-secret-key":
+    raise RuntimeError("SPENDLY_SECRET_KEY must be set when SPENDLY_ENV=production")
 
 CATEGORIES = [
     "Food",
@@ -45,7 +56,8 @@ CATEGORIES = [
 
 with app.app_context():
     init_db()
-    seed_db()
+    if os.environ.get("SPENDLY_SEED", "1") == "1":
+        seed_db()
 
 
 def _parse_date(val):
@@ -150,6 +162,21 @@ def login():
         return redirect(url_for("profile"))
 
     return render_template("login.html")
+
+
+@app.route("/healthz")
+def healthz():
+    """Liveness — process is up. Deliberately does not touch the DB, so a
+    locked/slow database never turns into a restart loop."""
+    return {"status": "ok"}, 200
+
+
+@app.route("/readyz")
+def readyz():
+    """Readiness — the DB is reachable and writable."""
+    if not db_is_healthy():
+        abort(503)
+    return {"status": "ready"}, 200
 
 
 # ------------------------------------------------------------------ #

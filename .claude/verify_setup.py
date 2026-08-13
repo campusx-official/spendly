@@ -123,13 +123,15 @@ app_src = (ROOT / "app.py").read_text(encoding="utf-8")
 routes = set(re.findall(r'@app\.route\("([^"]+)"', app_src))
 for r in ["/", "/register", "/login", "/logout", "/profile", "/expenses/add",
           "/expenses/<int:id>/edit", "/expenses/<int:id>/delete",
-          "/expenses/export", "/analytics", "/terms", "/privacy"]:
+          "/expenses/export", "/analytics", "/terms", "/privacy",
+          "/healthz", "/readyz"]:
     ok = check(r in routes, f"route {r} claimed but not in app.py")
     print(f"  {'OK  ' if ok else 'FAIL'} {r}")
 undocumented = routes - {
     "/", "/register", "/login", "/logout", "/profile", "/expenses/add",
     "/expenses/<int:id>/edit", "/expenses/<int:id>/delete",
     "/expenses/export", "/analytics", "/terms", "/privacy",
+    "/healthz", "/readyz",
 }
 check(not undocumented, f"routes in app.py missing from CLAUDE.md: {undocumented}")
 print(f"  {'OK  ' if not undocumented else 'FAIL'} no undocumented routes ({undocumented or 'none'})")

@@ -13,7 +13,8 @@ spendly/
 ├── database/
 │   ├── db.py           # Connection + schema + users:
 │   │                   #   get_db(), init_db(), seed_db(),
-│   │                   #   create_user(), get_user_by_email()
+│   │                   #   create_user(), get_user_by_email(),
+│   │                   #   db_is_healthy()
 │   └── queries.py      # Expense + profile reads/writes:
 │                       #   insert_expense(), get_expense_by_id(),
 │                       #   update_expense(), delete_expense_by_id(),
@@ -181,7 +182,7 @@ blocking guard (see the note in `settings.json`).
 **Verify the wiring after changing anything in `.claude/`:**
 
 ```bash
-python .claude/verify_setup.py     # 54 checks; exits non-zero on any break
+python .claude/verify_setup.py     # 56 checks; exits non-zero on any break
 ```
 
 It confirms every referenced agent, command, skill, path, DB helper, and route
@@ -304,6 +305,8 @@ stub routes left**.
 | `/analytics` | GET | logged-in | coming-soon page |
 | `/terms` | GET | public | — |
 | `/privacy` | GET | public | — |
+| `/healthz` | GET | public | phase 0 (deploy) |
+| `/readyz` | GET | public | phase 0 (deploy) |
 
 Ownership is enforced in the query layer: `get_expense_by_id(id, user_id)` returns
 `None` when the row belongs to someone else, and the route then calls `abort(404)`.
@@ -316,8 +319,12 @@ the ownership rule is that `user_id` is a required parameter of
 `_parse_date()` and clears both bounds on an inverted range, exactly as `/profile`
 does, so the two never disagree about which rows are in range.
 
-`/healthz` and `/readyz` do **not** exist yet. They are phase 0 of the deploy path
-— see `.claude/skills/spendly-devops/SKILL.md`.
+`/healthz` and `/readyz` are phase 0 of the deploy path — see
+`.claude/skills/spendly-devops/SKILL.md`. `/healthz` is a bare liveness check and
+deliberately never touches the DB; `/readyz` calls `db_is_healthy()` in
+`database/db.py` and returns 503 when the database is unreachable. Both are
+public and return only a small JSON status body — no version strings, no paths,
+no counts.
 
 ---
 
@@ -373,9 +380,10 @@ Registration posts `name`, `email`, `password`, `confirm_password`. Login posts
 - **Never install new packages** mid-feature without flagging it — keep `requirements.txt` in sync
 - **Never use JS frameworks** — the frontend is intentionally vanilla
 - **FK enforcement is manual** — SQLite foreign keys are off by default; `get_db()` must run `PRAGMA foreign_keys = ON` on every connection
+- **`get_db()` also sets `PRAGMA journal_mode = WAL` and `PRAGMA busy_timeout = 10000`** on every connection. `busy_timeout` and `foreign_keys` are per-connection and re-applied every call, which is correct. `journal_mode` is persistent *per database file*, not per connection — SQLite writes it into the file header on first call and every later connection (including a fresh `sqlite3.connect`) inherits WAL from the file itself. One consequence: a database file created before this change stays in the older `journal_mode` (usually `DELETE`) until some connection sets WAL on it once; after that, the `-wal` and `-shm` sidecar files appear next to the `.db` file and must ride along with it in any backup or `VACUUM INTO` copy.
 - The app runs on **port 5001**, not the Flask default 5000 — don't change this
-- **`app.secret_key` is hardcoded to `"dev-secret-key"`** and `debug=True` is hardcoded in `__main__`. Fine for local dev, unsafe anywhere else — phase 0 of the deploy skill fixes both. Do not deploy without it.
-- **`seed_db()` runs at import time** and creates `demo@spendly.com` / `demo123`. Harmless locally; a working backdoor on any public host.
+- **`app.secret_key` defaults to `"dev-secret-key"`** via `os.environ.get("SPENDLY_SECRET_KEY", "dev-secret-key")`, and `debug=True` is still hardcoded in `__main__`. The default is fine for local dev only; setting `SPENDLY_ENV=production` while the key is still the default raises `RuntimeError` at import time rather than deploying silently. `debug=True` remains unsafe on a public host — phase 1+ of the deploy skill runs under gunicorn instead, which never executes the `__main__` block.
+- **`seed_db()` runs at import time by default**, gated behind `SPENDLY_SEED` (default `"1"`, so local dev is unaffected) and creates `demo@spendly.com` / `demo123` when enabled. Every deployed phase sets `SPENDLY_SEED=0` — see `.claude/skills/spendly-devops/SKILL.md`. Leaving it enabled on a public host is a working backdoor.
 - **There is no CSRF protection.** `/expenses/<id>/delete` accepts POST, so a third-party page can trigger a delete in a logged-in browser. Known gap — raise it, don't silently add a dependency for it.
 - **There is no migration system.** `init_db()` only does `CREATE TABLE IF NOT EXISTS` and never alters existing tables. A schema change means hand-editing a live SQLite file — back it up first with `VACUUM INTO`, never `cp`.
 - **The SQLite files are untracked and gitignored** (`*.db`), because they hold real user emails and password hashes. Two consequences: your local database never appears in `git status`, and switching to a branch from before the untracking will delete it from disk. It is recoverable from history — `git checkout 1c738d6 -- spendly.db` — and `python app.py` will otherwise recreate an empty one with the demo seed. **Their prior contents remain in git history from commits before the untracking**; purging that needs a history rewrite, which has not been done.
