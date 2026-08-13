@@ -61,12 +61,27 @@ for name in sorted(referenced_agents):
 print("\nPATH references resolve (live docs only)")
 pattern = re.compile(r"[`(]((?:\.claude|database|templates|static|tests)/[\w./*-]+)[`)]")
 seen = set()
+# Headings whose body is a walkthrough of files a command WILL create. The paths
+# under them describe a future state, so they are not broken references.
+WALKTHROUGH = re.compile(r"^#+\s.*Adding a new feature", re.I)
+
 for f in scan:
     # .claude/specs/ are historical records of what each step planned; their file
     # names predate later renames and are not live wiring.
     if "specs" in f.parts:
         continue
+    walkthrough_depth = None  # heading level that opened the section, or None
     for line in f.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#"):
+            depth = len(line) - len(line.lstrip("#"))
+            if WALKTHROUGH.match(line):
+                walkthrough_depth = depth
+            elif walkthrough_depth is not None and depth <= walkthrough_depth:
+                # A heading at the same or shallower level closes the section.
+                # Deeper ones are its own sub-headings and stay inside.
+                walkthrough_depth = None
+        if walkthrough_depth is not None:
+            continue
         # Skip illustrative placeholders - "e.g. tests/test_login.py" names a
         # pattern to follow, not a file that must exist.
         if re.search(r"\be\.g\.|for example|such as", line, re.I):

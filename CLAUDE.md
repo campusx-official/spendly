@@ -187,6 +187,93 @@ a broken reference fails silently at runtime otherwise.
 
 ---
 
+## Adding a new feature — the end-to-end loop
+
+The commands chain in a fixed order. Each one has a gate; do not skip ahead.
+
+| # | Step | Command | Writes |
+|---|---|---|---|
+| 1 | Spec + branch | `/create-spec <n> <name>` | `.claude/specs/<NN>-<slug>.md`, `feature/<slug>` |
+| 2 | Plan | Shift+Tab ×2 → `Plan` subagent | nothing |
+| 3 | Implement | plain prompting | `database/`, `app.py`, `templates/`, `static/` |
+| 4 | Test | `/test-feature <NN>-<slug>` | `tests/test_<NN>_<slug>.py` |
+| 5 | Review | `/code-review-feature <NN>-<slug>` | nothing — read-only |
+| 6 | Verify | `pytest` + `python .claude/verify_setup.py` | nothing |
+| 7 | Ship | `/ship-feature` | commit, PR, squash-merge, branch cleanup |
+| 8 | Sync docs | manual edit | this file |
+
+Steps 1 and 7 both require a **clean working tree** — commit or stash first.
+
+### Worked example — step 10, export expenses to CSV
+
+Chosen because it exercises every layer without inventing a new one: a query
+helper, a route, an ownership check, a template button, and tests. It needs no new
+pip package (`csv` and `io` are stdlib), so the tech constraints hold.
+
+**1 — `/create-spec 10 export expenses csv`**
+Checks the tree is clean, branches to `feature/export-expenses-csv`, delegates
+research to the `Explore` subagent, writes `.claude/specs/10-export-expenses-csv.md`.
+Read the spec before continuing; it is the contract the test-writer will use.
+
+**2 — Plan mode.** Shift+Tab twice. The `Plan` subagent is mandatory here per the
+Subagent Policy above.
+
+**3 — Implement, bottom-up.** Data layer first so the route stays thin:
+
+- `database/queries.py` — add `get_expenses_for_export(user_id, date_from, date_to)`.
+  Reuse the existing `_build_date_filter()` helper. **Return raw values, not
+  display strings.** `get_recent_transactions()` deliberately formats amounts as
+  `"1,200.00"` and dates as `"03 Apr 2026"` for the profile table; a CSV needs
+  `1200.0` and `2026-04-03`. Do not reuse it — that is why this is a new helper,
+  and it also has a `limit=10` an export must not inherit.
+- `app.py` — add `GET /expenses/export`, logged-in only. Build the CSV with
+  `csv.writer` into an `io.StringIO`, return a `Response` with
+  `Content-Type: text/csv` and a `Content-Disposition` filename. Scope every row by
+  `session["user_id"]` — the query helper takes it as a parameter, same as
+  `get_expense_by_id`. Honour `date_from` / `date_to` query args through
+  `_parse_date()` so the export matches whatever filter the profile is showing.
+- `templates/profile.html` — one link in the filter bar,
+  `{{ url_for('export_expenses', date_from=date_from, date_to=date_to) }}`.
+  Never a hardcoded path.
+
+This route is the repo's first that returns a file rather than a template. That is
+fine — but it is the exception, so say so in the spec rather than letting it look
+like a new default.
+
+**4 — `/test-feature 10-export-expenses-csv`**
+`spendly-test-writer` writes tests from the **spec**, not from your implementation,
+then `spendly-test-runner` executes only that file. Expect coverage of: auth guard
+(302 to login), ownership (user A cannot export user B's rows), `Content-Type`,
+the header row, and date filtering.
+
+**5 — `/code-review-feature 10-export-expenses-csv`**
+Security and quality reviewers run in parallel, then a unified report and an
+approval gate. Nothing is edited until you say so.
+
+**6 — Verify.** `pytest` must be green, and `python .claude/verify_setup.py` must
+pass — it catches a route added to `app.py` but missing from the table below.
+
+**7 — `/ship-feature`.** Commits, pushes, opens a PR, waits on CI if configured,
+squash-merges, deletes both branches.
+
+**8 — Sync this file.** Add the route to the table below, bump the test count in
+the Testing section. Stale facts here actively mislead the subagents, which read
+this file as ground truth.
+
+### Other features that fit the current structure
+
+`/analytics` is a coming-soon placeholder and is the obvious step 10 — charts must
+be inline SVG, since no JS libraries are allowed. Also natural: category filter on
+the profile, expense search by description, monthly budget with a cap warning.
+
+### If the feature is infrastructure
+
+Deploying, containerising, or hosting is **not** this loop. It routes to
+`/deploy-phase <0-3|cicd>` via the `spendly-devops` skill — see the Subagent Policy
+above.
+
+---
+
 ## Routes
 
 All nine roadmap steps are implemented. There are **no stub routes left**.
