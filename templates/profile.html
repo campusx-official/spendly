@@ -51,6 +51,8 @@
                        value="{{ date_to or '' }}">
                 <button type="submit" class="filter-apply-btn">Apply</button>
             </form>
+            <a href="{{ url_for('export_expenses', date_from=date_from, date_to=date_to) }}"
+               class="filter-export-link">Export CSV</a>
         </div>
 
         <!-- Summary stats row -->

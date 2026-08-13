@@ -1,9 +1,12 @@
 import calendar
+import csv
+import io
 import sqlite3
 from datetime import date, datetime
 
 from flask import (
     Flask,
+    Response,
     abort,
     flash,
     redirect,
@@ -19,6 +22,7 @@ from database.queries import (
     delete_expense_by_id,
     get_category_breakdown,
     get_expense_by_id,
+    get_expenses_for_export,
     get_recent_transactions,
     get_summary_stats,
     get_user_by_id,
@@ -50,6 +54,34 @@ def _parse_date(val):
         return val
     except (ValueError, TypeError):
         return None
+
+
+def _csv_safe(value):
+    """Neutralise a cell a spreadsheet would evaluate as a formula.
+
+    Excel and Sheets treat a leading =, +, - or @ as the start of a formula,
+    so free text like "=cmd|'/c calc'!A1" would execute on open (CWE-1236).
+    Prefixing an apostrophe forces the cell to be read as text.
+
+    The trigger is tested against the leading-whitespace-stripped value,
+    because a spreadsheet trims before it evaluates — " =1+1" is as dangerous
+    as "=1+1".
+
+    Applied to every free-text column, not only the ones lacking input
+    validation. `/expenses/add` and `/expenses/<id>/edit` do constrain
+    category to CATEGORIES, but `database/db.py` declares it as plain
+    `TEXT NOT NULL` with no CHECK constraint, so seeds and any future writer
+    are not bound by that check. For a valid category this is a no-op.
+
+    This is a presentation concern, so it lives here rather than in the query
+    layer — get_expenses_for_export() deliberately returns raw values.
+    """
+    if value is None:
+        return ""
+    text = str(value)
+    if text.lstrip()[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text
 
 
 def _months_ago(today, n):
@@ -310,6 +342,53 @@ def delete_expense(id):
 
     delete_expense_by_id(id, session["user_id"])
     return redirect(url_for("profile"))
+
+
+# The only route that returns a file rather than a template — a deliberate
+# exception, not a new default.
+@app.route("/expenses/export")
+def export_expenses():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    date_from = _parse_date(request.args.get("date_from"))
+    date_to = _parse_date(request.args.get("date_to"))
+
+    # Mirror the profile's handling of an inverted range so the export and the
+    # table it sits next to never disagree. No flash() here: a file download
+    # renders no page, so the message would surface later on an unrelated one.
+    if date_from and date_to and date_from > date_to:
+        date_from = date_to = None
+
+    rows = get_expenses_for_export(session["user_id"], date_from, date_to)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["date", "category", "amount", "description"])
+    for row in rows:
+        writer.writerow(
+            [
+                row["date"],
+                _csv_safe(row["category"]),
+                row["amount"],
+                _csv_safe(row["description"]),
+            ]
+        )
+
+    if date_from and date_to:
+        stamp = f"{date_from}_to_{date_to}"
+    else:
+        stamp = date.today().isoformat()
+
+    return Response(
+        buffer.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="spendly-expenses-{stamp}.csv"'
+            )
+        },
+    )
 
 
 if __name__ == "__main__":

@@ -105,7 +105,7 @@ claimed = [
     "get_db", "init_db", "seed_db", "create_user", "get_user_by_email",
     "insert_expense", "get_expense_by_id", "update_expense",
     "delete_expense_by_id", "get_user_by_id", "get_recent_transactions",
-    "get_summary_stats", "get_category_breakdown",
+    "get_summary_stats", "get_category_breakdown", "get_expenses_for_export",
 ]
 for name in claimed:
     ok = check(name in defined, f"helper '{name}' claimed in docs but not defined")
@@ -116,14 +116,14 @@ print("\nRoutes claimed in CLAUDE.md exist in app.py")
 app_src = (ROOT / "app.py").read_text(encoding="utf-8")
 routes = set(re.findall(r'@app\.route\("([^"]+)"', app_src))
 for r in ["/", "/register", "/login", "/logout", "/profile", "/expenses/add",
-          "/expenses/<int:id>/edit", "/expenses/<int:id>/delete", "/analytics",
-          "/terms", "/privacy"]:
+          "/expenses/<int:id>/edit", "/expenses/<int:id>/delete",
+          "/expenses/export", "/analytics", "/terms", "/privacy"]:
     ok = check(r in routes, f"route {r} claimed but not in app.py")
     print(f"  {'OK  ' if ok else 'FAIL'} {r}")
 undocumented = routes - {
     "/", "/register", "/login", "/logout", "/profile", "/expenses/add",
-    "/expenses/<int:id>/edit", "/expenses/<int:id>/delete", "/analytics",
-    "/terms", "/privacy",
+    "/expenses/<int:id>/edit", "/expenses/<int:id>/delete",
+    "/expenses/export", "/analytics", "/terms", "/privacy",
 }
 check(not undocumented, f"routes in app.py missing from CLAUDE.md: {undocumented}")
 print(f"  {'OK  ' if not undocumented else 'FAIL'} no undocumented routes ({undocumented or 'none'})")

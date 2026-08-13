@@ -18,7 +18,8 @@ spendly/
 │                       #   insert_expense(), get_expense_by_id(),
 │                       #   update_expense(), delete_expense_by_id(),
 │                       #   get_user_by_id(), get_recent_transactions(),
-│                       #   get_summary_stats(), get_category_breakdown()
+│                       #   get_summary_stats(), get_category_breakdown(),
+│                       #   get_expenses_for_export()
 ├── templates/          # base.html + one file per page
 ├── static/
 │   ├── css/            # style.css global; one file per page otherwise
@@ -170,7 +171,7 @@ blocking guard (see the note in `settings.json`).
 **Verify the wiring after changing anything in `.claude/`:**
 
 ```bash
-python .claude/verify_setup.py     # 52 checks; exits non-zero on any break
+python .claude/verify_setup.py     # 54 checks; exits non-zero on any break
 ```
 
 It confirms every referenced agent, command, skill, path, DB helper, and route
@@ -276,7 +277,8 @@ above.
 
 ## Routes
 
-All nine roadmap steps are implemented. There are **no stub routes left**.
+All nine roadmap steps are implemented, plus step 10 (CSV export). There are **no
+stub routes left**.
 
 | Route | Methods | Access | Step |
 |---|---|---|---|
@@ -288,6 +290,7 @@ All nine roadmap steps are implemented. There are **no stub routes left**.
 | `/expenses/add` | GET, POST | logged-in | 07 |
 | `/expenses/<int:id>/edit` | GET, POST | logged-in (owner only) | 08 |
 | `/expenses/<int:id>/delete` | POST | logged-in (owner only) | 09 |
+| `/expenses/export` | GET | logged-in | 10 |
 | `/analytics` | GET | logged-in | coming-soon page |
 | `/terms` | GET | public | — |
 | `/privacy` | GET | public | — |
@@ -295,6 +298,13 @@ All nine roadmap steps are implemented. There are **no stub routes left**.
 Ownership is enforced in the query layer: `get_expense_by_id(id, user_id)` returns
 `None` when the row belongs to someone else, and the route then calls `abort(404)`.
 Keep that pattern for any new per-resource route.
+
+`/expenses/export` is the only route that returns a file rather than a template — a
+deliberate exception, not a new default. It is not per-resource, so its equivalent of
+the ownership rule is that `user_id` is a required parameter of
+`get_expenses_for_export()` and every row is scoped by it in SQL. It also reuses
+`_parse_date()` and clears both bounds on an inverted range, exactly as `/profile`
+does, so the two never disagree about which rows are in range.
 
 `/healthz` and `/readyz` do **not** exist yet. They are phase 0 of the deploy path
 — see `.claude/skills/spendly-devops/SKILL.md`.
@@ -304,7 +314,7 @@ Keep that pattern for any new per-resource route.
 ## Testing
 
 ```bash
-pytest                              # full suite — currently 186 passed, 0 failed
+pytest                              # full suite — currently 215 passed, 0 failed
 pytest tests/test_06_date_filter_profile.py
 pytest -k "test_name"
 pytest -s                           # visible output

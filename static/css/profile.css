@@ -438,6 +438,34 @@
     opacity: 0.9;
 }
 
+.filter-export-link {
+    margin-left: auto;
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--paper);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.filter-export-link:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-light);
+}
+
+/* Must live after .filter-export-link, not in the 640px block above the
+   .filter-* rules — a media query adds no specificity, so the earlier block
+   would lose to margin-left: auto. */
+@media (max-width: 640px) {
+    .filter-export-link {
+        margin-left: 0;
+    }
+}
+
 .tx-empty {
     text-align: center;
     padding: 2rem;
