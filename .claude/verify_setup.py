@@ -112,6 +112,12 @@ for name in claimed:
     print(f"  {'OK  ' if ok else 'FAIL'} {name}")
 
 # ------------------------------------------------------- routes in app.py
+#
+# NOTE for phase 0 of the deploy path: adding /healthz and /readyz to app.py will
+# fail BOTH checks below until they are added to CLAUDE.md's route table AND to the
+# two literal route lists in this section. The list is duplicated on purpose - once
+# forward ("claimed routes exist") and once in reverse ("no undocumented routes") -
+# so a route added to only one place is caught. Update all three together.
 print("\nRoutes claimed in CLAUDE.md exist in app.py")
 app_src = (ROOT / "app.py").read_text(encoding="utf-8")
 routes = set(re.findall(r'@app\.route\("([^"]+)"', app_src))

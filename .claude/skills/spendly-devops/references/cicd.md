@@ -6,9 +6,9 @@ to `main` (that is what the `/ship-feature` slash command does) → deploy from 
 
 ## Baseline before you start
 
-The suite is green: **186 passed, 0 failed**, across
+The suite is green: **215 passed, 0 failed**, across
 `test_06_date_filter_profile.py`, `test_07_add_expense.py`,
-`test_09_delete_expense.py`, and `test_hooks.py`. Confirm that locally with
+`test_09_delete_expense.py`, `test_10_export_expenses_csv.py`, and `test_hooks.py`. Confirm that locally with
 `python -m pytest -q` before wiring anything — a pipeline that is red on its first
 run is a pipeline everyone learns to ignore.
 

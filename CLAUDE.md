@@ -26,7 +26,9 @@ spendly/
 │   └── js/main.js      # Vanilla JS only (currently empty)
 ├── tests/              # pytest; see "Testing" below
 ├── pytest.ini          # pythonpath = .
-├── requirements.txt    # dev + test deps
+├── requirements.txt    # dev + test deps — do not add to this
+├── requirements-prod.txt   # `-r requirements.txt` + gunicorn; deployed runtime only
+├── docs/images/        # screenshots for documentation
 └── .claude/            # Claude Code setup — see "Claude Code setup" below
 ```
 
@@ -60,11 +62,19 @@ spendly/
 - **No new pip packages** — work within `requirements.txt` as-is unless explicitly told otherwise
 - Python 3.10+ assumed — f-strings and `match` statements are fine
 
-**The one sanctioned exception:** deployment needs a WSGI server, because
-`app.run(debug=True)` exposes the Werkzeug debugger (remote code execution) and must
-never face the internet. When phase 1 of the deploy path runs, `gunicorn` goes into a
-new `requirements-prod.txt` (`-r requirements.txt` plus the pin) and
-`requirements.txt` stays untouched. Any other new package still needs an explicit ask.
+**The one sanctioned exception — approved and landed.** Deployment needs a WSGI
+server, because `app.run(debug=True)` exposes the Werkzeug debugger (remote code
+execution) and must never face the internet. `gunicorn==23.0.0` therefore lives in
+**`requirements-prod.txt`**, which is `-r requirements.txt` plus that one pin.
+`requirements.txt` is unchanged and stays that way.
+
+- Local dev: `pip install -r requirements.txt`, run `python app.py` — unaffected
+- Deployed: `pip install -r requirements-prod.txt`, and the container `CMD` invokes
+  `gunicorn ... app:app`, so the `__main__` block never executes
+- **gunicorn does not run on Windows** (it needs `fcntl`). It installs fine, but it
+  only *runs* inside the Linux container. On a Windows host keep using `python app.py`.
+
+Any other new package still needs an explicit ask.
 
 ---
 

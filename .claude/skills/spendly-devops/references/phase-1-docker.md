@@ -119,8 +119,10 @@ Notes on specific choices:
   Alpine's musl means no manylinux wheels, so pip compiles from source and the
   build gets slower and larger, not smaller.
 - **Explicit `COPY` lines, no `COPY . .`** — belt and braces with
-  `.dockerignore`. The repo root holds three committed `.db` files plus `file.txt`
-  and `test.md` scratch notes; none of them belong in an image.
+  `.dockerignore`. The `.db` files are untracked now, but they still **exist on disk
+  in every working checkout**, and `.gitignore` does not filter a Docker build
+  context — only `.dockerignore` does. `file.txt` and `test.md` scratch notes are
+  still at the repo root too. None of it belongs in an image.
 - **Non-root `USER`** — matters here because phase 3 sets `runAsNonRoot: true`.
   Build the habit in phase 1 so the manifest does not need a workaround.
 - **`urllib` healthcheck** — `python:*-slim` ships no `curl` or `wget`. A

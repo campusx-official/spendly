@@ -263,7 +263,7 @@ project facts, so stale docs actively mislead them.
 ## Before you deploy anything: repo state to check
 
 Both of the issues this section originally flagged have been fixed — the SQLite
-files are untracked and gitignored, and the test suite is green at 186 passed. Two
+files are untracked and gitignored, and the test suite is green at 215 passed. Two
 things still need verifying every time, because neither is enforced by anything:
 
 1. **`.dockerignore` must exclude `*.db`.** The database is gitignored, but it
@@ -278,7 +278,7 @@ things still need verifying every time, because neither is enforced by anything:
    done, and it is a separate decision — do not attempt it as part of a deploy task.
 
 2. **Confirm the suite is green before wiring CI**, with `python -m pytest -q`.
-   The baseline is 186 passed, 0 failed. A red suite turns the first pipeline run
+   The baseline is 215 passed, 0 failed. A red suite turns the first pipeline run
    into noise everyone learns to ignore. `python .claude/verify_setup.py` should
    also pass all its checks — it catches references in these skill files that have
    drifted from the codebase.

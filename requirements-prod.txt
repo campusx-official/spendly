@@ -1,0 +1,21 @@
+# Runtime dependencies for a deployed Spendly (phases 1-3).
+#
+# `requirements.txt` stays untouched, per CLAUDE.md's no-new-packages rule — this
+# file layers the one sanctioned addition on top of it.
+#
+# Why gunicorn is required and not optional: app.py ends with
+# `app.run(debug=True, port=5001)`, and debug=True serves the Werkzeug interactive
+# debugger, which executes arbitrary Python from the browser. Anything reachable
+# over a network must be served by a real WSGI server instead. The container CMD
+# imports `app:app` as a WSGI callable, so the `__main__` block never runs and
+# stays exactly as-is for local `python app.py`.
+#
+# Install locally with:  pip install -r requirements-prod.txt
+#
+# Note: this inherits the dev/test pins too, so pytest lands in the image as well.
+# That is the deliberate trade for leaving requirements.txt alone. If image size
+# ever matters, the fix is to split runtime deps out of requirements.txt — a
+# separate decision, not a deploy task.
+-r requirements.txt
+
+gunicorn==23.0.0
