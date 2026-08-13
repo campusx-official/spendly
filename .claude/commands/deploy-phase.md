@@ -63,10 +63,14 @@ Run these before invoking any subagent.
    to close phase 0 first. Just make it visible.
 
 4. **Baseline the test suite.** Run `python -m pytest -q`. Record the pass/fail
-   counts so a regression introduced by phase 0 is attributable. Three failures in
-   `tests/test_06_date_filter_profile.py::TestQueryHelpers` are known and
-   pre-existing — see `SKILL.md`. Any other failure: report it and ask whether to
-   continue before invoking the engineer.
+   counts so a regression introduced by this run is attributable.
+
+   **The suite is fully green — 215 passed, 0 failed.** There are no known or
+   excusable failures. Any failure at all is either a real regression or a genuinely
+   new test: report it and ask whether to continue before invoking the engineer.
+   (An earlier version of this file excused three failures in
+   `tests/test_06_date_filter_profile.py::TestQueryHelpers` as pre-existing. Those
+   were wrong assertions and were fixed; do not excuse them again.)
 
 ---
 
