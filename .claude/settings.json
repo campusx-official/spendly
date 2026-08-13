@@ -33,5 +33,23 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(docker compose ps *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(python .claude/verify_setup.py)",
+      "Bash(python3 .claude/verify_setup.py)",
+      "Bash(docker info)",
+      "Bash(docker compose logs *)",
+      "Bash(systemctl is-active *)",
+      "Bash(docker compose config *)",
+      "mcp__plugin_aws-dev-toolkit_awsknowledge__aws___search_documentation",
+      "mcp__plugin_aws-dev-toolkit_awsknowledge__aws___read_documentation",
+      "mcp__MCP_DOCKER__mcp-find"
+    ]
   }
 }
