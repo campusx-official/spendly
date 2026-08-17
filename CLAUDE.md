@@ -29,6 +29,9 @@ spendly/
 ├── pytest.ini          # pythonpath = .
 ├── requirements.txt    # dev + test deps — do not add to this
 ├── requirements-prod.txt   # `-r requirements.txt` + gunicorn; deployed runtime only
+├── Dockerfile          # phase 1 — gunicorn on :5001, non-root, DB on a volume
+├── .dockerignore       # phase 1 — excludes *.db/*.db-wal/*.db-shm, .git, venv
+├── compose.yaml        # phase 1 — local single-host run with a named volume
 ├── docs/images/        # screenshots for documentation
 └── .claude/            # Claude Code setup — see "Claude Code setup" below
 ```
