@@ -11,24 +11,40 @@ Spendly is a lightweight personal expense tracker built with Flask and SQLite.
 spendly/
 ├── app.py              # All routes — single file, no blueprints
 ├── database/
-│   └── db.py           # SQLite helpers: get_db(), init_db(), seed_db()
-├── templates/
-│   ├── base.html       # Shared layout — all templates must extend this
-│   └── *.html          # One template per page
+│   ├── db.py           # Connection + schema + users:
+│   │                   #   get_db(), init_db(), seed_db(),
+│   │                   #   create_user(), get_user_by_email(),
+│   │                   #   db_is_healthy()
+│   └── queries.py      # Expense + profile reads/writes:
+│                       #   insert_expense(), get_expense_by_id(),
+│                       #   update_expense(), delete_expense_by_id(),
+│                       #   get_user_by_id(), get_recent_transactions(),
+│                       #   get_summary_stats(), get_category_breakdown(),
+│                       #   get_expenses_for_export()
+├── templates/          # base.html + one file per page
 ├── static/
-│   ├── css/
-│   │   ├── style.css       # Global styles
-│   │   └── landing.css     # Landing-page-only styles
-│   └── js/
-│       └── main.js         # Vanilla JS only
-└── requirements.txt
+│   ├── css/            # style.css global; one file per page otherwise
+│   └── js/main.js      # Vanilla JS only (currently empty)
+├── tests/              # pytest; see "Testing" below
+├── pytest.ini          # pythonpath = .
+├── requirements.txt    # dev + test deps — do not add to this
+├── requirements-prod.txt   # `-r requirements.txt` + gunicorn; deployed runtime only
+├── Dockerfile          # phase 1 — gunicorn on :5001, non-root, DB on a volume
+├── .dockerignore       # phase 1 — excludes *.db/*.db-wal/*.db-shm, .git, venv
+├── compose.yaml        # phase 1 — local single-host run with a named volume
+├── docs/images/        # screenshots for documentation
+└── .claude/            # Claude Code setup — see "Claude Code setup" below
 ```
 
 **Where things belong:**
 - New routes → `app.py` only, no blueprints
-- DB logic → `database/db.py` only, never inline in routes
+- DB logic → `database/` only, never inline in routes
+  - connection, schema, or `users` work → `db.py`
+  - anything querying `expenses`, or shaping profile data → `queries.py`
 - New pages → new `.html` file extending `base.html`
 - Page-specific styles → new `.css` file, not inline `<style>` tags
+- Deployment artifacts → created per phase by `/deploy-phase`; paths are listed in
+  `.claude/skills/spendly-devops/SKILL.md`. Update this tree when they first appear.
 
 ---
 
@@ -50,6 +66,20 @@ spendly/
 - **No new pip packages** — work within `requirements.txt` as-is unless explicitly told otherwise
 - Python 3.10+ assumed — f-strings and `match` statements are fine
 
+**The one sanctioned exception — approved and landed.** Deployment needs a WSGI
+server, because `app.run(debug=True)` exposes the Werkzeug debugger (remote code
+execution) and must never face the internet. `gunicorn==23.0.0` therefore lives in
+**`requirements-prod.txt`**, which is `-r requirements.txt` plus that one pin.
+`requirements.txt` is unchanged and stays that way.
+
+- Local dev: `pip install -r requirements.txt`, run `python app.py` — unaffected
+- Deployed: `pip install -r requirements-prod.txt`, and the container `CMD` invokes
+  `gunicorn ... app:app`, so the `__main__` block never executes
+- **gunicorn does not run on Windows** (it needs `fcntl`). It installs fine, but it
+  only *runs* inside the Linux container. On a Windows host keep using `python app.py`.
+
+Any other new package still needs an explicit ask.
+
 ---
 
 ## Subagent Policy
@@ -60,6 +90,36 @@ spendly/
 - When asked to plan, delegate codebase research 
   to a subagent before presenting the plan
 - always use a builtin plan subagent in plan mode
+
+### DevOps requests route automatically
+
+Any request about deploying, containerising, hosting, provisioning,
+scaling, backing up, or automating the release of Spendly is DevOps
+work — whether or not the user names a phase or knows a command exists.
+"Can you dockerize this", "put it on EC2", "why is my pod pending",
+"set up GitHub Actions" all qualify.
+
+For those requests:
+
+1. **Load the `spendly-devops` skill first.** Never write a
+   Dockerfile, manifest, nginx config, or workflow from general
+   knowledge — the skill carries traps specific to this repo (the
+   hardcoded DB path, the import-time demo seed, the single-writer
+   ceiling, the committed `.db` files).
+2. **Delegate to a subagent, do not do it inline:**
+   - `spendly-devops-engineer` to build artifacts and phase-0 code changes
+   - `spendly-devops-reviewer` to audit artifacts, read-only
+   - Both, in that order, via `/deploy-phase <0|1|2|3|cicd>`
+3. **Relay the subagent's `## Handover` block** to the user in your own
+   words — what changed, what is verified, what is still open — then
+   stop and await direction.
+4. **Never commit, push, or mutate live cloud or cluster state** as part
+   of a DevOps request. Print the command; let the user run it.
+
+Phase 0 of the skill is a hard prerequisite for phases 1-3. The
+`UserPromptSubmit` hook at `.claude/hooks/devops_router.py` injects this
+routing reminder automatically, but this policy applies whether or not
+the hook fires.
 
 ---
 
@@ -88,30 +148,245 @@ pytest -s
 
 ---
 
-## Implemented vs stub routes
+## Claude Code setup
 
-| Route | Status |
+`.claude/` is wired as chains: a slash command orchestrates subagents, and the
+subagents load a skill for domain knowledge. Keep these references in sync — if you
+rename a command, agent, or skill, update every row below and the files themselves.
+
+| Command | Subagents (in order) | Skill loaded | Writes files? |
+|---|---|---|---|
+| `/create-spec <n> <name>` | `Explore` for codebase research | — | spec + branch |
+| `/test-feature <spec>` | `spendly-test-writer` → `spendly-test-runner` | — | `tests/` only |
+| `/code-review-feature <spec>` | `spendly-security-reviewer` ∥ `spendly-quality-reviewer` (parallel) | — | no, read-only |
+| `/deploy-phase <0-3\|cicd>` | `spendly-devops-engineer` → `spendly-devops-reviewer` | `spendly-devops` | deploy artifacts |
+| `/seed-user`, `/seed-expense` | — | — | DB rows only |
+| `/ship-feature` | — | — | commits, PR, merge |
+
+**Skills** live in `.claude/skills/<name>/SKILL.md`. Directory name must match the
+frontmatter `name`, or the skill will not register.
+
+| Skill | Purpose | References |
+|---|---|---|
+| `spendly-devops` | deploy phases 0-3 + CI/CD | `references/phase-1-docker.md`, `phase-2-cloud-vm.md`, `phase-3-kubernetes.md`, `cicd.md` |
+| `spendly-ui-designer` | frontend design language | — (manual invocation only) |
+
+**Hooks** are Python scripts in `.claude/hooks/`, registered in
+`.claude/settings.json`. They invoke `python3`; on a machine without it, change the
+interpreter name — do **not** add a `|| python` fallback, which would break the
+blocking guard (see the note in `settings.json`).
+
+| Hook | Event | Effect |
+|---|---|---|
+| `devops_router.py` | `UserPromptSubmit` | routes DevOps-shaped prompts to the chain above |
+| `format_python.py` | `PostToolUse` on Write/Edit | `black` on `.py` files; no-ops if black is not installed |
+| `protect_paths.py` | `PreToolUse` on Bash | exit 2 blocks destructive commands against `spendly.db`, `.env`, `migrations/` |
+
+**Verify the wiring after changing anything in `.claude/`:**
+
+```bash
+python .claude/verify_setup.py     # 56 checks; exits non-zero on any break
+```
+
+It confirms every referenced agent, command, skill, path, DB helper, and route
+actually exists, that each skill directory matches its frontmatter `name`, that
+`CLAUDE.md`'s route table matches `app.py` in both directions, and that no template
+hardcodes a URL. Run it whenever you rename or add a command, agent, or skill —
+a broken reference fails silently at runtime otherwise.
+
+**Boundaries between the reviewers** — do not let them overlap:
+
+- `spendly-security-reviewer` — auth, injection, authorization, data exposure in app code
+- `spendly-quality-reviewer` — naming, file placement, Flask idiom, maintainability in app code
+- `spendly-devops-reviewer` — deployment artifacts only (Dockerfile, manifests, workflows)
+
+---
+
+## Adding a new feature — the end-to-end loop
+
+The commands chain in a fixed order. Each one has a gate; do not skip ahead.
+
+| # | Step | Command | Writes |
+|---|---|---|---|
+| 1 | Spec + branch | `/create-spec <n> <name>` | `.claude/specs/<NN>-<slug>.md`, `feature/<slug>` |
+| 2 | Plan | Shift+Tab ×2 → `Plan` subagent | nothing |
+| 3 | Implement | plain prompting | `database/`, `app.py`, `templates/`, `static/` |
+| 4 | Test | `/test-feature <NN>-<slug>` | `tests/test_<NN>_<slug>.py` |
+| 5 | Review | `/code-review-feature <NN>-<slug>` | nothing — read-only |
+| 6 | Verify | `pytest` + `python .claude/verify_setup.py` | nothing |
+| 7 | Ship | `/ship-feature` | commit, PR, squash-merge, branch cleanup |
+| 8 | Sync docs | manual edit | this file |
+
+Steps 1 and 7 both require a **clean working tree** — commit or stash first.
+
+### Worked example — step 10, export expenses to CSV
+
+Chosen because it exercises every layer without inventing a new one: a query
+helper, a route, an ownership check, a template button, and tests. It needs no new
+pip package (`csv` and `io` are stdlib), so the tech constraints hold.
+
+**1 — `/create-spec 10 export expenses csv`**
+Checks the tree is clean, branches to `feature/export-expenses-csv`, delegates
+research to the `Explore` subagent, writes `.claude/specs/10-export-expenses-csv.md`.
+Read the spec before continuing; it is the contract the test-writer will use.
+
+**2 — Plan mode.** Shift+Tab twice. The `Plan` subagent is mandatory here per the
+Subagent Policy above.
+
+**3 — Implement, bottom-up.** Data layer first so the route stays thin:
+
+- `database/queries.py` — add `get_expenses_for_export(user_id, date_from, date_to)`.
+  Reuse the existing `_build_date_filter()` helper. **Return raw values, not
+  display strings.** `get_recent_transactions()` deliberately formats amounts as
+  `"1,200.00"` and dates as `"03 Apr 2026"` for the profile table; a CSV needs
+  `1200.0` and `2026-04-03`. Do not reuse it — that is why this is a new helper,
+  and it also has a `limit=10` an export must not inherit.
+- `app.py` — add `GET /expenses/export`, logged-in only. Build the CSV with
+  `csv.writer` into an `io.StringIO`, return a `Response` with
+  `Content-Type: text/csv` and a `Content-Disposition` filename. Scope every row by
+  `session["user_id"]` — the query helper takes it as a parameter, same as
+  `get_expense_by_id`. Honour `date_from` / `date_to` query args through
+  `_parse_date()` so the export matches whatever filter the profile is showing.
+- `templates/profile.html` — one link in the filter bar,
+  `{{ url_for('export_expenses', date_from=date_from, date_to=date_to) }}`.
+  Never a hardcoded path.
+
+This route is the repo's first that returns a file rather than a template. That is
+fine — but it is the exception, so say so in the spec rather than letting it look
+like a new default.
+
+**4 — `/test-feature 10-export-expenses-csv`**
+`spendly-test-writer` writes tests from the **spec**, not from your implementation,
+then `spendly-test-runner` executes only that file. Expect coverage of: auth guard
+(302 to login), ownership (user A cannot export user B's rows), `Content-Type`,
+the header row, and date filtering.
+
+**5 — `/code-review-feature 10-export-expenses-csv`**
+Security and quality reviewers run in parallel, then a unified report and an
+approval gate. Nothing is edited until you say so.
+
+**6 — Verify.** `pytest` must be green, and `python .claude/verify_setup.py` must
+pass — it catches a route added to `app.py` but missing from the table below.
+
+**7 — `/ship-feature`.** Commits, pushes, opens a PR, waits on CI if configured,
+squash-merges, deletes both branches.
+
+**8 — Sync this file.** Add the route to the table below, bump the test count in
+the Testing section. Stale facts here actively mislead the subagents, which read
+this file as ground truth.
+
+### Other features that fit the current structure
+
+`/analytics` is a coming-soon placeholder and is the obvious step 10 — charts must
+be inline SVG, since no JS libraries are allowed. Also natural: category filter on
+the profile, expense search by description, monthly budget with a cap warning.
+
+### If the feature is infrastructure
+
+Deploying, containerising, or hosting is **not** this loop. It routes to
+`/deploy-phase <0-3|cicd>` via the `spendly-devops` skill — see the Subagent Policy
+above.
+
+---
+
+## Routes
+
+All nine roadmap steps are implemented, plus step 10 (CSV export). There are **no
+stub routes left**.
+
+| Route | Methods | Access | Step |
+|---|---|---|---|
+| `/` | GET | public | — |
+| `/register` | GET, POST | public | 02 |
+| `/login` | GET, POST | public | 03 |
+| `/logout` | GET | public | 03 |
+| `/profile` | GET | logged-in | 04, 05, 06 |
+| `/expenses/add` | GET, POST | logged-in | 07 |
+| `/expenses/<int:id>/edit` | GET, POST | logged-in (owner only) | 08 |
+| `/expenses/<int:id>/delete` | POST | logged-in (owner only) | 09 |
+| `/expenses/export` | GET | logged-in | 10 |
+| `/analytics` | GET | logged-in | coming-soon page |
+| `/terms` | GET | public | — |
+| `/privacy` | GET | public | — |
+| `/healthz` | GET | public | phase 0 (deploy) |
+| `/readyz` | GET | public | phase 0 (deploy) |
+
+Ownership is enforced in the query layer: `get_expense_by_id(id, user_id)` returns
+`None` when the row belongs to someone else, and the route then calls `abort(404)`.
+Keep that pattern for any new per-resource route.
+
+`/expenses/export` is the only route that returns a file rather than a template — a
+deliberate exception, not a new default. It is not per-resource, so its equivalent of
+the ownership rule is that `user_id` is a required parameter of
+`get_expenses_for_export()` and every row is scoped by it in SQL. It also reuses
+`_parse_date()` and clears both bounds on an inverted range, exactly as `/profile`
+does, so the two never disagree about which rows are in range.
+
+`/healthz` and `/readyz` are phase 0 of the deploy path — see
+`.claude/skills/spendly-devops/SKILL.md`. `/healthz` is a bare liveness check and
+deliberately never touches the DB; `/readyz` calls `db_is_healthy()` in
+`database/db.py` and returns 503 when the database is unreachable. Both are
+public and return only a small JSON status body — no version strings, no paths,
+no counts.
+
+---
+
+## Testing
+
+```bash
+pytest                              # full suite — currently 215 passed, 0 failed
+pytest tests/test_06_date_filter_profile.py
+pytest -k "test_name"
+pytest -s                           # visible output
+```
+
+Feature test files are named `test_<NN>_<slug>.py` with underscores throughout —
+`test_06_date_filter_profile.py`, `test_07_add_expense.py`,
+`test_09_delete_expense.py`. Keep that shape; hyphens break `-k` filtering.
+
+`tests/test_hooks.py` covers the `.claude/hooks/` scripts over their real
+stdin/stdout JSON contract. It exists because `protect_paths.py` shipped with five
+false positives, each of which blocked an ordinary command:
+
+| Blocked | Why |
 |---|---|
-| `GET /` | Implemented — renders `landing.html` |
-| `GET /register` | Implemented — renders `register.html` |
-| `GET /login` | Implemented — renders `login.html` |
-| `GET /logout` | Stub — Step 3 |
-| `GET /profile` | Stub — Step 4 |
-| `GET /expenses/add` | Stub — Step 7 |
-| `GET /expenses/<id>/edit` | Stub — Step 8 |
-| `GET /expenses/<id>/delete` | Stub — Step 9 |
+| `git add -A` | `dd\b` matched the "dd" inside **add** |
+| `echo 'confirm ...'` | `rm\b` matched the "rm" inside **confirm** |
+| `-> arrows` in prose | `>` read as a truncating redirect |
+| `>/dev/null` | same, on a discard redirect |
+| `<noreply@anthropic.com>` | the closing `>` of an angle-bracketed email |
 
-**Do not implement a stub route unless the active task explicitly targets that step.**
+Every verb now needs a **leading** word boundary, redirects exclude arrows,
+comparisons, appends and `/dev/*`, angle-bracketed tokens are stripped first, and
+`git rm --cached` is allowed because it is index-only. All five are pinned as
+tests. Run them after editing any hook.
+
+Note the guard matches substrings of the command text, so it will also block a
+command that merely *mentions* a protected path alongside a destructive verb — a
+test harness passing `rm spendly.db` as data, for instance. That is why the hook
+cases live in a file rather than inline in a shell command.
+
+Test files patch `database.db.DB_PATH` to a `tempfile` **before importing `app`**,
+so they never touch the real `spendly.db`. Reuse that pattern — do not add a
+`conftest.py` that conflicts with it, and do not rely on `app.config['DATABASE']`,
+which the app does not read.
+
+Registration posts `name`, `email`, `password`, `confirm_password`. Login posts
+`email`, `password`. There is no `username` field anywhere.
 
 ---
 
 ## Warnings and things to avoid
 
-- **Never use raw string returns for stub routes** once a step is implemented — always render a template
 - **Never hardcode URLs** in templates — always use `url_for()`
-- **Never put DB logic in route functions** — it belongs in `database/db.py`
+- **Never put DB logic in route functions** — it belongs in `database/db.py` or `database/queries.py`
 - **Never install new packages** mid-feature without flagging it — keep `requirements.txt` in sync
 - **Never use JS frameworks** — the frontend is intentionally vanilla
-- **`database/db.py` is currently empty** — do not assume helpers exist until the step that implements them
 - **FK enforcement is manual** — SQLite foreign keys are off by default; `get_db()` must run `PRAGMA foreign_keys = ON` on every connection
+- **`get_db()` also sets `PRAGMA journal_mode = WAL` and `PRAGMA busy_timeout = 10000`** on every connection. `busy_timeout` and `foreign_keys` are per-connection and re-applied every call, which is correct. `journal_mode` is persistent *per database file*, not per connection — SQLite writes it into the file header on first call and every later connection (including a fresh `sqlite3.connect`) inherits WAL from the file itself. One consequence: a database file created before this change stays in the older `journal_mode` (usually `DELETE`) until some connection sets WAL on it once; after that, the `-wal` and `-shm` sidecar files appear next to the `.db` file and must ride along with it in any backup or `VACUUM INTO` copy.
 - The app runs on **port 5001**, not the Flask default 5000 — don't change this
+- **`app.secret_key` defaults to `"dev-secret-key"`** via `os.environ.get("SPENDLY_SECRET_KEY", "dev-secret-key")`, and `debug=True` is still hardcoded in `__main__`. The default is fine for local dev only; setting `SPENDLY_ENV=production` while the key is still the default raises `RuntimeError` at import time rather than deploying silently. `debug=True` remains unsafe on a public host — phase 1+ of the deploy skill runs under gunicorn instead, which never executes the `__main__` block.
+- **`seed_db()` runs at import time by default**, gated behind `SPENDLY_SEED` (default `"1"`, so local dev is unaffected) and creates `demo@spendly.com` / `demo123` when enabled. Every deployed phase sets `SPENDLY_SEED=0` — see `.claude/skills/spendly-devops/SKILL.md`. Leaving it enabled on a public host is a working backdoor.
+- **There is no CSRF protection.** `/expenses/<id>/delete` accepts POST, so a third-party page can trigger a delete in a logged-in browser. Known gap — raise it, don't silently add a dependency for it.
+- **There is no migration system.** `init_db()` only does `CREATE TABLE IF NOT EXISTS` and never alters existing tables. A schema change means hand-editing a live SQLite file — back it up first with `VACUUM INTO`, never `cp`.
+- **The SQLite files are untracked and gitignored** (`*.db`), because they hold real user emails and password hashes. Two consequences: your local database never appears in `git status`, and switching to a branch from before the untracking will delete it from disk. It is recoverable from history — `git checkout 1c738d6 -- spendly.db` — and `python app.py` will otherwise recreate an empty one with the demo seed. **Their prior contents remain in git history from commits before the untracking**; purging that needs a history rewrite, which has not been done.

@@ -113,6 +113,30 @@ def get_recent_transactions(user_id, limit=10, date_from=None, date_to=None):
     ]
 
 
+def get_expenses_for_export(user_id, date_from=None, date_to=None):
+    date_clause, date_params = _build_date_filter(date_from, date_to)
+    params = [user_id] + date_params
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT date, category, amount, description "
+        "FROM expenses "
+        "WHERE user_id = ? " + date_clause + " ORDER BY date DESC, id DESC",
+        params,
+    ).fetchall()
+    conn.close()
+
+    return [
+        {
+            "date": row["date"],
+            "category": row["category"],
+            "amount": row["amount"],
+            "description": row["description"] or "",
+        }
+        for row in rows
+    ]
+
+
 def get_summary_stats(user_id, date_from=None, date_to=None):
     date_clause, date_params = _build_date_filter(date_from, date_to)
     params = [user_id] + date_params

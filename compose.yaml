@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    image: spendly:local
+    ports:
+      - "5001:5001"
+    environment:
+      SPENDLY_SECRET_KEY: ${SPENDLY_SECRET_KEY:?set SPENDLY_SECRET_KEY in .env}
+      SPENDLY_DB_PATH: /data/spendly.db
+      SPENDLY_SEED: "0"
+      SPENDLY_ENV: production
+    volumes:
+      - spendly-data:/data
+    restart: unless-stopped
+
+volumes:
+  spendly-data:

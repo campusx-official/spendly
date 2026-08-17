@@ -128,19 +128,34 @@ Structure your report as follows:
 
 Always check test output for signals of these common Spendly mistakes:
 - SQL queries using f-strings instead of `?` placeholders → security violation
-- Route functions containing DB logic → must be in `database/db.py`
+- Route functions containing DB logic → must be in `database/db.py` or `database/queries.py`
 - Hardcoded URLs in templates → must use `url_for()`
 - `return "error string"` in routes → must use `abort()`
 - App running on port 5000 → must be 5001
 - Any JS framework imports → only vanilla JS allowed
-- `database/db.py` helpers assumed to exist before they are implemented → check step status in CLAUDE.md
+
+## Known baseline — do not report these as new failures
+
+- **The suite is green.** As of the last full run: **186 passed, 0 failed.** Any
+  failure you see is therefore a real regression or a genuinely new test. Do not
+  describe a failure as "pre-existing" without checking `git diff` first.
+- **All nine roadmap steps are implemented; there are no stub routes left.** If a
+  test fails because a route "isn't implemented yet", the test is wrong, not the app.
+- **DB helpers all exist** across `database/db.py` and `database/queries.py`. An
+  `ImportError` from `database.queries` means a typo, not an unimplemented step.
+- **`/healthz` and `/readyz` do not exist yet** — they are phase 0 of the deploy
+  path. A test targeting them is premature; say so and point at
+  `.claude/skills/spendly-devops/SKILL.md`.
+- **Tests isolate by patching `database.db.DB_PATH` before importing `app`.** If a
+  test run mutates the developer's real `spendly.db`, that patch is missing or
+  happens too late — flag it as critical, because it destroys real data.
 
 ---
 
 ## Escalation Policy
 
 - If tests cannot run due to import errors or missing dependencies, diagnose and report — do NOT attempt to install new packages
-- If a test file exercises a stub route that is not yet implemented per CLAUDE.md, flag this clearly: "This test targets a stub route — implementation must precede testing"
+- There are no stub routes left, so "the route isn't implemented yet" is not a valid diagnosis for a route in `CLAUDE.md`'s route table. If a test targets something genuinely absent (`/healthz`, `/readyz`, a CSRF token), say the test is premature and name what it depends on.
 - If results are ambiguous, re-run with `pytest -s` for full output before concluding
 
 ---

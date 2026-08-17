@@ -1,8 +1,18 @@
 venv/
-expense_tracker.db
 __pycache__/
 *.pyc
 *.pyo
 .env
 .DS_Store
 .claude/plans/
+
+# SQLite databases hold real user data - never commit them.
+# spendly.db, spendly-backup.db and database/spendly.db are still TRACKED from
+# before this rule existed. Untrack them with:
+#   git rm --cached spendly.db spendly-backup.db database/spendly.db
+*.db
+*.db-wal
+*.db-shm
+
+# Windows / cygwin crash artifacts
+*.stackdump

@@ -3,14 +3,32 @@ import sqlite3
 
 from werkzeug.security import generate_password_hash
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "spendly.db")
+DB_PATH = os.environ.get(
+    "SPENDLY_DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "spendly.db"),
+)
 
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     return conn
+
+
+def db_is_healthy():
+    """Readiness check — the DB is reachable and writable. DB logic only;
+    the /readyz route in app.py calls this rather than touching sqlite3
+    or get_db() directly."""
+    try:
+        conn = get_db()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+        return True
+    except sqlite3.Error:
+        return False
 
 
 def init_db():
