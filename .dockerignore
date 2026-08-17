@@ -1,0 +1,36 @@
+.git
+.gitignore
+.github
+.claude
+venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+tests/
+pytest.ini
+.pytest_cache/
+
+# Committed databases — must never reach an image. Untracked by git but they
+# DO exist on disk in every working checkout (spendly.db, spendly-backup.db at
+# the repo root today), and .gitignore does not filter a Docker build context
+# — only this file does. WAL mode (phase 0) can also leave -wal/-shm sidecar
+# files next to the DB while the app is running; both excluded too.
+#
+# `**/` prefix is deliberate, not decorative: verified by build that a bare
+# `*.db` here only matches at the build-context ROOT in this Docker/BuildKit
+# version, not recursively like a .gitignore pattern. A probe file placed at
+# database/_probe.db leaked straight into an image layer under a bare `*.db`
+# rule and was only caught once changed to `**/*.db`. `database/spendly.db`
+# is exactly the kind of nested path .gitignore's own comment says used to be
+# tracked, so root-only matching here is not a hypothetical risk.
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+.env
+.DS_Store
+file.txt
+test.md
+*.stackdump
+README.md
+docs/
