@@ -1,5 +1,5 @@
 venv/
-expense_tracker.db
+*.db
 __pycache__/
 *.pyc
 *.pyo
